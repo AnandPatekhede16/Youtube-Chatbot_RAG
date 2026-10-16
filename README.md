@@ -1,7 +1,7 @@
 <div align="center">
 
 # 🎬 TubeMind AI
-### Production-Grade YouTube RAG & Real-Time Audience Social Listening Platform
+### Production-Grade YouTube RAG, Audience Intelligence & Interactive Study Platform
 
 [![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.40%2B-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)](https://streamlit.io/)
@@ -11,7 +11,7 @@
 [![OpenAI](https://img.shields.io/badge/OpenAI-GPT--4o--mini-412991?style=for-the-badge&logo=openai&logoColor=white)](https://openai.com/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)](LICENSE)
 
-**Deep semantic search across 2+ hour long-form videos with exact timestamp citations (`[MM:SS]`), resilient subtitles fallback when captions are disabled, and real-time public comments intelligence without API quota limits.**
+**Deep semantic search across 2+ hour long-form videos with exact timestamp citations (`[MM:SS]`), in-sync interactive video player seeking, voice-to-voice interaction, concept flashcards, comprehension quizzes, visual Mermaid mind maps, and real-time public audience intelligence without API quota limits.**
 
 [Features](#-key-features--architectural-pillars) • [Architecture](#-system-architecture) • [Module Breakdown](#-sequential-module-by-module-breakdown) • [Getting Started](#-step-by-step-installation--setup) • [Live Usage](#-how-to-run-the-application) • [Troubleshooting](#-troubleshooting--faq)
 
@@ -50,8 +50,9 @@ chunks = RecursiveCharacterTextSplitter().create_documents([transcript])
 3. **Ignoring the Audience**: Transcripts capture only the creator's perspective. The goldmine of viewer fact-checks, alternative viewpoints, counter-arguments, and recurring doubts in the comment section is completely lost.
 4. **Vulnerability to API Outages (`503 UNAVAILABLE` / `429 Quota`)**: Free-tier LLMs encounter frequent demand spikes. A single `503` breaks the entire user session.
 5. **Slow Latency & Wasted Costs**: Re-embedding a 10,000-word video on every page reload burns API quota and forces the user to wait several minutes repeatedly.
+6. **No Educational Assessment or Audio Capabilities**: Naive bots provide only raw text chat without active-recall study aids or voice accessibility.
 
-**TubeMind AI solves all five pitfalls** through a production-grade, fault-tolerant RAG pipeline and an integrated audience social listening engine.
+**TubeMind AI solves all of these challenges** through a production-grade, fault-tolerant RAG pipeline, interactive in-sync player, voice integration, and automated study coaching.
 
 ---
 
@@ -78,15 +79,26 @@ chunks = RecursiveCharacterTextSplitter().create_documents([transcript])
   $$\text{gemini-3.5-flash} \longrightarrow \text{gemini-3.5-flash-lite} \longrightarrow \text{gemini-3-flash-preview}$$
 * Features exponential backoff with jitter to guarantee 99.9% uptime.
 
-### 5. 💾 Instant Local Disk Caching
-* Raw transcripts, parsed comments, audience intelligence reports, and FAISS vector databases are saved locally in `storage/`.
+### 5. 🎓 Smart Study & Concept Learning Hub
+* **Comprehension Quizzes**: Generates 5-question multiple choice quizzes with instant automated scoring, explanations, and timestamp citations.
+* **Active Recall Flashcards**: 2-column active-recall flashcard deck highlighting core principles and breakthroughs.
+* **Visual Mind Maps (Mermaid.js)**: Constructs an automated hierarchical flowchart of the video's core thesis, pillars, and actionable mechanisms.
+* **1-Click Study Notes Export**: Downloads a complete Markdown study guide (`.md`) containing executive digest, flashcards, quiz solutions, and audience feedback.
+
+### 6. 🎧 Voice-to-Voice Interaction & In-Sync Interactive Video Player
+* **In-Sync Video Player**: Embedded 16:9 YouTube iframe player with live playhead tracking. Clicking any timestamp citation (`▶️ Seek MM:SS`) immediately seeks the video to that second on-page.
+* **Speech-to-Text Voice Dictation**: Web Speech API dictation widget (`🎙️ Ask with Voice`) for hands-free speech question input.
+* **Text-to-Speech Audio Playback**: Browser-native `window.speechSynthesis` (`🔊 Listen to Answer`) that reads AI answers aloud in natural audio.
+
+### 7. 💾 Instant Local Disk Caching
+* Raw transcripts, parsed comments, audience intelligence reports, study materials, and FAISS vector databases are saved locally in `storage/`.
 * Re-opening a previously analyzed video loads in **0.05 seconds** with **$0 API cost**.
 
-### 6. 🎨 Sleek Modern SaaS Web Interface
+### 8. 🎨 Sleek Modern SaaS Web Interface
 * Modern dark/light theme adaptive CSS.
 * Clean Streamlit header without default hamburger menus, deploy buttons, or footers.
 * Prominent, collapsible sidebar with smooth toggle controls.
-* Interactive tabs for Q&A, Audience Hub, Executive Summaries, and Searchable Transcripts.
+* Clean layout: Primary controls at top, in-sync player in center, and API settings tucked cleanly at the bottom.
 
 ---
 
@@ -111,30 +123,36 @@ flowchart TD
         J --> K["Structured Audience Report (storage/comments_analysis/)"]
     end
 
-    subgraph INDEXING["3. Vector Indexing & Caching"]
-        G --> L["TimestampAwareChunker (src/text_processor.py)"]
-        L --> M{"Is FAISS Cached Locally?"}
-        M -- Yes --> N["Load Local FAISS (0.05s, $0 Cost)"]
-        M -- No --> O["Rate-Limit Batch Embeddings (Batches of 50)"]
-        O --> P["Save FAISS Index (storage/vectors/)"]
-        P --> N
+    subgraph STUDY_LAYER["3. Educational & Concept Hub"]
+        G --> L1["Comprehension Quiz Engine (src/study_service.py)"]
+        G --> L2["Active Recall Flashcards (src/study_service.py)"]
+        G --> L3["Visual Mermaid Mind Map (src/study_service.py)"]
+        L1 & L2 & L3 --> L4["1-Click Markdown Study Notes Export"]
     end
 
-    subgraph RAG_CORE["4. Conversational Retrieval & Resilience"]
-        Q["User Query"] --> R["Query Rewriter (Conversation History Aware)"]
-        R --> N
-        N --> S["Retrieved Context + Audience Intelligence"]
-        S --> T["Cascading LLM Router (src/rag_engine.py)"]
-        T -->|Primary| U["gemini-3.5-flash"]
-        T -->|503/429 Fallback 1| V["gemini-3.5-flash-lite"]
-        T -->|503/429 Fallback 2| W["gemini-3-flash-preview"]
-        U & V & W --> X["Strictly Grounded Response with Timestamp Citations"]
+    subgraph INDEXING["4. Vector Indexing & Caching"]
+        G --> M["TimestampAwareChunker (src/text_processor.py)"]
+        M --> N{"Is FAISS Cached Locally?"}
+        N -- Yes --> O["Load Local FAISS (0.05s, $0 Cost)"]
+        N -- No --> P["Rate-Limit Batch Embeddings (Batches of 50)"]
+        P --> Q["Save FAISS Index (storage/vectors/)"]
+        Q --> O
     end
 
-    subgraph UI["5. Presentation Layer"]
-        X --> Y["Streamlit SaaS Web Interface (app.py)"]
-        K --> Y
-        C --> Y
+    subgraph RAG_CORE["5. Conversational Retrieval & Voice Interactivity"]
+        R1["User Voice Input (Web Speech API)"] --> R2["Text Query"]
+        R2 --> S["Query Rewriter (Conversation History Aware)"]
+        S --> O
+        O --> T["Retrieved Context + Audience Intelligence"]
+        T --> U["Cascading LLM Router (src/rag_engine.py)"]
+        U --> V["Grounded Answer with Deep-Link Citations"]
+        V --> W["Text-to-Speech Engine (window.speechSynthesis)"]
+    end
+
+    subgraph UI["6. In-Sync Presentation Layer"]
+        V --> X["Interactive Streamlit SaaS UI (app.py)"]
+        X --> Y["In-Sync YouTube Player (Auto-Seek on Citation Click)"]
+        K & L4 --> X
     end
 ```
 
@@ -144,31 +162,36 @@ flowchart TD
 
 ```
 D:\Youtube Chatbot\
-├── app.py                     # Streamlit SaaS web application
-├── cli.py                     # Interactive command-line terminal interface
-├── requirements.txt           # Python dependency specifications
-├── .env.example               # Template environment configuration
-├── .gitignore                 # Excludes .env, virtual environments, and caches
-├── README.md                  # Comprehensive system documentation
+├── app.py                         # Streamlit SaaS web application
+├── cli.py                         # Interactive command-line terminal interface
+├── requirements.txt               # Python dependency specifications
+├── .env.example                   # Template environment configuration
+├── .gitignore                     # Excludes .env, virtual environments, and caches
+├── LICENSE                        # MIT License
+├── README.md                      # Comprehensive system documentation
 │
-├── src/                       # Modular Python source packages
+├── src/                           # Modular Python source packages
 │   ├── __init__.py
-│   ├── config.py              # Environment variables, file paths, and model configs
-│   ├── youtube_service.py     # URL parsing, transcript fetcher, and chapter fallback
-│   ├── comments_service.py    # Public comments scraper via YouTube InnerTube
-│   ├── comments_analyzer.py   # Audience sentiment, debates, and community consensus
-│   ├── text_processor.py      # TimestampAwareChunker preserving second offsets
-│   ├── vectorstore.py         # FAISS vector store with rate-limit safe batching
-│   └── rag_engine.py          # Conversational RAG with multi-model fallback chain
+│   ├── config.py                  # Environment variables, file paths, and model configs
+│   ├── youtube_service.py         # URL parsing, transcript fetcher, and chapter fallback
+│   ├── comments_service.py        # Public comments scraper via YouTube InnerTube
+│   ├── comments_analyzer.py       # Audience sentiment, debates, and community consensus
+│   ├── study_service.py           # Quizzes, flashcards, Mermaid mind map, study notes export
+│   ├── voice_player_service.py    # In-sync embedded video player, Web Speech API mic & TTS
+│   ├── text_processor.py          # TimestampAwareChunker preserving second offsets
+│   ├── vectorstore.py             # FAISS vector store with rate-limit safe batching
+│   └── rag_engine.py              # Conversational RAG with multi-model fallback chain
 │
-├── storage/                   # Local persistent cache directory (git-ignored)
-│   ├── transcripts/           # Cached video subtitles and chapters (JSON)
-│   ├── comments/              # Cached public viewer comments (JSON)
-│   ├── comments_analysis/     # Cached audience sentiment reports (JSON)
-│   └── vectors/               # Cached FAISS index and docstore files
+├── storage/                       # Local persistent cache directory (git-ignored)
+│   ├── transcripts/               # Cached video subtitles and chapters (JSON)
+│   ├── comments/                  # Cached public viewer comments (JSON)
+│   ├── comments_analysis/         # Cached audience sentiment reports (JSON)
+│   ├── study/                     # Cached quizzes, flashcards, and mind maps (JSON)
+│   └── vectors/                   # Cached FAISS index and docstore files
 │
-└── tests/                     # Automated testing suite
-    └── test_pipeline.py       # End-to-end integration and fallback tests
+└── tests/                         # Automated testing suite
+    ├── test_pipeline.py           # End-to-end integration and fallback tests
+    └── test_study_and_player.py   # Unit tests for voice, player, and study components
 ```
 
 ---
@@ -176,7 +199,7 @@ D:\Youtube Chatbot\
 ## ⚙️ Sequential Module-by-Module Breakdown
 
 ### 1. `src/config.py` — Central System Settings
-* Validates runtime configuration and creates persistent directories (`storage/transcripts/`, `storage/comments/`, `storage/vectors/`).
+* Validates runtime configuration and creates persistent directories (`storage/transcripts/`, `storage/comments/`, `storage/study/`, `storage/vectors/`).
 * Configures default AI providers (`gemini` or `openai`), model names, chunk sizing (`target_chunk_size = 1600`), overlap, and retrieval top-k ($k=4$).
 
 ### 2. `src/youtube_service.py` — Video Ingestion & Fallback Engine
@@ -200,33 +223,46 @@ D:\Youtube Chatbot\
   * `top_viewer_questions`: Common unanswered doubts left by the audience.
   * `future_topic_requests`: Viewer requests for follow-up videos.
 
-### 5. `src/text_processor.py` — Timestamp-Aware Chunking
+### 5. `src/study_service.py` — Interactive Study & Educational Suite
+* **`generate_quiz(...)`**: Produces a 5-question multiple-choice knowledge quiz with options, 0-indexed answer key, timestamp cues, and educational rationale.
+* **`generate_flashcards(...)`**: Creates high-yield active-recall concept flashcards with categories and actionable takeaways.
+* **`generate_mindmap(...)`**: Generates a valid Mermaid.js concept hierarchy flowchart mapping the video's core thesis, pillars, and actionable mechanisms.
+* **`generate_study_notes_markdown(...)`**: Compiles an executive brief, flashcards, quiz solutions, and audience consensus into an exportable `.md` file.
+
+### 6. `src/voice_player_service.py` — Voice & In-Sync Interactive Video Player
+* **`render_sync_player_html(...)`**: Embeds a 16:9 responsive YouTube player with playhead seeking capabilities.
+* **`render_voice_input_html(...)`**: Native Web Speech API dictation widget with mic animation and one-click copy to chat.
+* **`render_tts_player_html(...)`**: Inline speech synthesis button (`🔊 Listen to Answer`) that speaks AI responses aloud using browser speech synthesis.
+* **`strip_markdown_for_speech(...)`**: Cleans markdown brackets, symbols, and URLs to ensure natural audio pronunciation.
+
+### 7. `src/text_processor.py` — Timestamp-Aware Chunking
 * Implements `TimestampAwareChunker`. Instead of destroying metadata by flattening text, it aggregates chronological snippets into ~1600 character chunks while tracking:
   * `start_seconds` & `end_seconds`
   * Formatted strings (`[MM:SS]`)
   * Direct deep-link URLs (`https://youtu.be/{video_id}?t={start_seconds}`)
 * Embeds time markers directly into the text header so the LLM explicitly cites video moments.
 
-### 6. `src/vectorstore.py` — FAISS Vector Store & Safe Batching
+### 8. `src/vectorstore.py` — FAISS Vector Store & Safe Batching
 * Builds and queries high-speed FAISS vector indexes.
 * **Safe Rate-Limit Batching**: Embeds chunks in batches of 50 with automatic backoff and retry (`RESOURCE_EXHAUSTED` / `429` detection) to avoid Google Gemini free-tier rate limits.
 * Checks disk cache before embedding: previously indexed videos load in **0.05 seconds**.
 
-### 7. `src/rag_engine.py` — Conversational Engine with Resilience
+### 9. `src/rag_engine.py` — Conversational Engine with Resilience
 * **Multi-Model Fallback**: Uses `invoke_with_resilience` to cascade across `gemini-3.5-flash`, `gemini-3.5-flash-lite`, and `gemini-3-flash-preview` if high traffic (`503`) or quota limits (`429`) occur.
 * **Dual-Context Grounding**: System prompt provides both the **video transcript** and **audience comments data**, allowing users to ask questions about both the video content and audience reactions.
 * **Conversational Memory**: Rephrases follow-up questions in light of chat history.
 * **Executive Summaries**: Produces comprehensive digests with core breakthroughs and action items.
 
-### 8. `app.py` — SaaS Web Application
+### 10. `app.py` — SaaS Web Application
 * Built with Streamlit and styled with responsive CSS.
 * Clean top header with hidden default Streamlit menus and footers.
 * Prominent, collapsible sidebar with an expand button (`>>`) for toggling navigation.
-* 4 dedicated tabs:
-  1. **💬 Video & Audience Q&A**
-  2. **🗣️ Audience & Comments Hub**
-  3. **📋 Executive Summary**
-  4. **📜 Searchable Transcript**
+* 5 dedicated tabs:
+  1. **💬 Video & Audience Q&A** (Voice dictation, audio playback, in-sync seek)
+  2. **🗣️ Audience & Comments Hub** (Sentiment, consensus, debates, top doubts)
+  3. **🎓 Study & Learning Hub** (Comprehension quiz, flashcards, mind map, study notes export)
+  4. **📋 Executive Summary** (Comprehensive executive digest with 1-click regeneration)
+  5. **📜 Searchable Transcript** (Real-time keyword search across dialogue cues)
 
 ---
 
@@ -294,10 +330,14 @@ You can run full video analysis and Q&A directly in your terminal:
 python cli.py --url "https://www.youtube.com/watch?v=4Vz6L8B73i4"
 ```
 
-### Option C: Run Automated Integration Tests
-Verify end-to-end functionality including subtitle ingestion, chapter fallback, comment scraping, FAISS indexing, and LLM reasoning:
+### Option C: Run Automated Integration & Unit Tests
+Verify pipeline and component integrity:
 ```powershell
+# Run end-to-end RAG pipeline integration tests
 python tests/test_pipeline.py
+
+# Run voice, interactive player, and study hub unit tests
+python tests/test_study_and_player.py
 ```
 
 ---
@@ -319,7 +359,7 @@ python tests/test_pipeline.py
 
 | Video Title / Topic | Video ID | Category | Status & Verification |
 | :--- | :--- | :--- | :--- |
-| **Dr. Sahar Yousef: Focus & Productivity Guide** | `4Vz6L8B73i4` | Long-form Podcast | ✅ Verified: Grounded Q&A, deep-link citations, comments analyzed. |
+| **Dr. Sahar Yousef: Focus & Productivity Guide** | `4Vz6L8B73i4` | Long-form Podcast | ✅ Verified: Grounded Q&A, deep-link citations, comments, quizzes, and mind maps. |
 | **Barbara Butcher: Forensic Investigator (No Captions)** | `lgBLqo8TwgE` | Subtitles Disabled | ✅ Verified: 50 Chapters & Timestamps recovered via fallback engine. |
 | **Demis Hassabis: AI & DeepMind (Lex Fridman)** | `Gfr50f6ZBvo` | Tech & AI Research | ✅ Verified: Multi-model RAG, executive digest generated. |
 
@@ -338,7 +378,12 @@ Google Gemini free tier occasionally experiences temporary load spikes. TubeMind
 </details>
 
 <details>
-<summary><b>3. How do I switch to OpenAI?</b></summary>
+<summary><b>3. How does In-Sync Player seeking work?</b></summary>
+When you click <code>▶️ Seek</code> next to any timestamp citation in the chat, TubeMind AI updates the embedded player's playhead parameter to that exact start second and refreshes the player smoothly.
+</details>
+
+<details>
+<summary><b>4. How do I switch to OpenAI?</b></summary>
 In your <code>.env</code> file, set:
 <pre>
 AI_PROVIDER=openai
@@ -346,12 +391,7 @@ OPENAI_API_KEY=sk-...
 OPENAI_CHAT_MODEL=gpt-4o-mini
 OPENAI_EMBEDDING_MODEL=text-embedding-3-small
 </pre>
-Or switch directly from the <b>⚙️ AI Model & API Configuration</b> expander in the sidebar UI.
-</details>
-
-<details>
-<summary><b>4. How do I clear the local cache?</b></summary>
-Simply delete or empty the folders inside <code>storage/</code> (e.g. <code>storage/vectors/</code>, <code>storage/transcripts/</code>, <code>storage/comments/</code>). TubeMind AI will re-index fresh on the next run.
+Or switch directly from the <b>⚙️ AI Model Configuration</b> expander in the sidebar UI.
 </details>
 
 ---
@@ -363,10 +403,15 @@ Simply delete or empty the folders inside <code>storage/</code> (e.g. <code>stor
 - [x] Zero-quota public comments scraping via InnerTube
 - [x] Audience sentiment, vibe tags, consensus, and debate extraction
 - [x] Multi-model fallback chain (`503` & `429` resilience)
+- [x] Interactive Knowledge Quiz with instant scoring and explanations
+- [x] Active recall concept flashcards deck
+- [x] Visual concept tree and mind map generator (Mermaid.js)
+- [x] 1-Click Markdown Study Notes Export
+- [x] In-Sync embedded video player with jump-to-timestamp seeking
+- [x] Voice dictation (Web Speech API) & Audio response speech synthesis
 - [x] SaaS-grade modern dark/light web UI
-- [ ] Multi-video comparative synthesis (chat across entire playlists)
-- [ ] Exportable executive briefs (PDF and Markdown download)
-- [ ] Whisper audio transcription fallback for videos with zero captions and zero chapters
+- [ ] Multi-video playlist comparative synthesis
+- [ ] Direct Whisper audio transcription fallback for videos with zero captions and zero chapters
 
 Contributions are welcome! Please feel free to open an issue or submit a Pull Request.
 
@@ -379,5 +424,5 @@ This project is licensed under the **MIT License** — see the [LICENSE](LICENSE
 ---
 
 <div align="center">
-  <b>Built with ❤️ for AI researchers, content creators, and podcast listeners.</b>
+  <b>Built with ❤️ for AI researchers, content creators, students, and podcast listeners.</b>
 </div>

@@ -9,12 +9,14 @@ VECTORS_DIR = STORAGE_DIR / "vectors"
 TRANSCRIPTS_DIR = STORAGE_DIR / "transcripts"
 COMMENTS_DIR = STORAGE_DIR / "comments"
 COMMENTS_ANALYSIS_DIR = STORAGE_DIR / "comments_analysis"
+STUDY_DIR = STORAGE_DIR / "study"
 
 # Ensure storage directories exist
 VECTORS_DIR.mkdir(parents=True, exist_ok=True)
 TRANSCRIPTS_DIR.mkdir(parents=True, exist_ok=True)
 COMMENTS_DIR.mkdir(parents=True, exist_ok=True)
 COMMENTS_ANALYSIS_DIR.mkdir(parents=True, exist_ok=True)
+STUDY_DIR.mkdir(parents=True, exist_ok=True)
 
 # Load .env file
 ENV_PATH = PROJECT_ROOT / ".env"

@@ -20,6 +20,18 @@ from src.comments_analyzer import analyze_comments
 from src.text_processor import TimestampAwareChunker, get_full_transcript_text
 from src.vectorstore import build_or_load_vector_store, is_video_indexed
 from src.rag_engine import YouTubeRAG
+from src.study_service import (
+    generate_quiz,
+    generate_flashcards,
+    generate_mindmap,
+    generate_study_notes_markdown
+)
+from src.voice_player_service import (
+    render_sync_player_html,
+    render_voice_input_html,
+    render_tts_player_html
+)
+import streamlit.components.v1 as components
 
 # 1. Page Configuration
 st.set_page_config(
@@ -235,6 +247,18 @@ if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 if "summary" not in st.session_state:
     st.session_state.summary = None
+if "current_seek" not in st.session_state:
+    st.session_state.current_seek = 0
+if "quiz_data" not in st.session_state:
+    st.session_state.quiz_data = None
+if "flashcards_data" not in st.session_state:
+    st.session_state.flashcards_data = None
+if "mindmap_data" not in st.session_state:
+    st.session_state.mindmap_data = None
+if "quiz_submitted" not in st.session_state:
+    st.session_state.quiz_submitted = False
+if "quiz_user_answers" not in st.session_state:
+    st.session_state.quiz_user_answers = {}
 
 # 4. Sidebar: Clean, Sleek SaaS Layout
 with st.sidebar:
@@ -253,8 +277,43 @@ with st.sidebar:
 
     load_btn = st.button("🚀 Analyze Video & Audience", use_container_width=True, type="primary")
 
-    # Collapsible Settings tucked cleanly out of the main view
-    with st.expander("⚙️ AI Model & API Configuration", expanded=False):
+    # In-Sync Video Player in Sidebar if loaded
+    if st.session_state.video_id and st.session_state.video_meta:
+        st.markdown("---")
+        meta = st.session_state.video_meta
+        st.markdown(f"**{meta.get('title', 'Video')}**")
+        st.caption(f"👤 Channel: {meta.get('author', 'Unknown')}")
+
+        components.html(
+            render_sync_player_html(
+                st.session_state.video_id, 
+                start_seconds=st.session_state.current_seek,
+                autoplay=(st.session_state.current_seek > 0)
+            ),
+            height=205
+        )
+
+        if st.session_state.current_seek > 0:
+            c_ts, c_rst = st.columns([2, 1])
+            with c_ts:
+                st.caption(f"⏱️ Playing: **{format_timestamp(st.session_state.current_seek)}**")
+            with c_rst:
+                if st.button("⏮️ 00:00", help="Reset player to beginning"):
+                    st.session_state.current_seek = 0
+                    st.rerun()
+
+        is_cached = is_video_indexed(st.session_state.video_id, provider=AI_PROVIDER)
+        st.markdown(
+            "<span class='badge-pill badge-green'>⚡ Index Cached on Disk</span>" 
+            if is_cached else "<span class='badge-pill badge-blue'>✨ Newly Indexed</span>", 
+            unsafe_allow_html=True
+        )
+        if st.session_state.comments:
+            st.markdown(f"<span class='badge-pill badge-purple'>💬 {len(st.session_state.comments)} Comments Analyzed</span>", unsafe_allow_html=True)
+
+    st.markdown("---")
+    # AI Model & API Configuration cleanly tucked at bottom of sidebar
+    with st.expander("⚙️ AI Model Configuration", expanded=False):
         provider_choice = st.selectbox(
             "AI Provider",
             options=["gemini", "openai"],
@@ -326,30 +385,18 @@ with st.sidebar:
                     )
                     st.session_state.chat_history = []
                     st.session_state.summary = None
+                    st.session_state.current_seek = 0
+                    st.session_state.quiz_data = None
+                    st.session_state.flashcards_data = None
+                    st.session_state.mindmap_data = None
+                    st.session_state.quiz_submitted = False
+                    st.session_state.quiz_user_answers = {}
 
                     st.success("✅ Analysis ready!")
                     st.rerun()
 
                 except Exception as e:
                     st.error(f"❌ Error: {str(e)}")
-
-    # Video Card in Sidebar if loaded
-    if st.session_state.video_id and st.session_state.video_meta:
-        st.markdown("---")
-        meta = st.session_state.video_meta
-        st.markdown(f"**{meta.get('title', 'Video')}**")
-        st.caption(f"👤 Channel: {meta.get('author', 'Unknown')}")
-
-        st.video(f"https://www.youtube.com/watch?v={st.session_state.video_id}")
-
-        is_cached = is_video_indexed(st.session_state.video_id, provider=AI_PROVIDER)
-        st.markdown(
-            "<span class='badge-pill badge-green'>⚡ Index Cached on Disk</span>" 
-            if is_cached else "<span class='badge-pill badge-blue'>✨ Newly Indexed</span>", 
-            unsafe_allow_html=True
-        )
-        if st.session_state.comments:
-            st.markdown(f"<span class='badge-pill badge-purple'>💬 {len(st.session_state.comments)} Comments Analyzed</span>", unsafe_allow_html=True)
 
 # 5. Main Content Area
 st.markdown("<div class='brand-title'>TubeMind AI</div>", unsafe_allow_html=True)
@@ -398,9 +445,10 @@ else:
         st.info(f"ℹ️ **Note:** Speech subtitles were disabled by the creator for this video. TubeMind AI automatically recovered **{ch_count} Video Chapters & Timestamps** plus **Audience Comments** so complete Q&A, chapter navigation, and social listening work seamlessly!")
 
     # 7. Main Feature Tabs
-    tab_chat, tab_comments, tab_summary, tab_transcript = st.tabs([
+    tab_chat, tab_comments, tab_study, tab_summary, tab_transcript = st.tabs([
         "💬 Video & Audience Q&A", 
         "🗣️ Audience & Comments Hub", 
+        "🎓 Study & Learning Hub",
         "📋 Executive Summary", 
         "📜 Searchable Transcript"
     ])
@@ -425,21 +473,34 @@ else:
             if st.button("🗣️ What did viewers say in comments?", use_container_width=True):
                 sample_q = "What are viewers in the comments saying about this discussion?"
 
+        # Voice Dictation Widget
+        components.html(render_voice_input_html(), height=85)
+
         # Display Chat History
-        for item in st.session_state.chat_history:
+        for i, item in enumerate(st.session_state.chat_history):
             role = item["role"]
             content = item["content"]
             sources = item.get("sources", [])
 
             with st.chat_message(role):
                 st.markdown(content)
+                if role == "assistant" and not content.startswith("❌"):
+                    components.html(render_tts_player_html(content, button_id=f"hist_{i}"), height=36)
+
                 if sources:
-                    with st.expander("📌 View Timestamp Citations & Source Moments", expanded=False):
-                        for s in sources:
+                    with st.expander("📌 View Timestamp Citations & In-Sync Seek", expanded=False):
+                        for j, s in enumerate(sources):
                             ts = s.get("timestamp", "N/A")
                             url = s.get("url", "#")
                             snippet_text = s.get("text", "")
-                            st.markdown(f"**[{ts}]({url})** — *\"{snippet_text}\"*")
+                            sec = s.get("start", 0)
+                            c_txt, c_seek = st.columns([4, 1])
+                            with c_txt:
+                                st.markdown(f"**[{ts}]({url})** — *\"{snippet_text}\"*")
+                            with c_seek:
+                                if st.button("▶️ Seek", key=f"seek_h_{i}_{j}", help=f"Seek player to {ts}"):
+                                    st.session_state.current_seek = int(sec)
+                                    st.rerun()
 
         # Chat Input
         user_query = st.chat_input("Ask any question about the video or audience comments...")
@@ -467,13 +528,22 @@ else:
                         sources = result["sources"]
 
                         st.markdown(answer)
+                        components.html(render_tts_player_html(answer, button_id=f"new_{len(st.session_state.chat_history)}"), height=36)
+
                         if sources:
-                            with st.expander("📌 View Timestamp Citations & Source Moments", expanded=False):
-                                for s in sources:
+                            with st.expander("📌 View Timestamp Citations & In-Sync Seek", expanded=False):
+                                for j, s in enumerate(sources):
                                     ts = s.get("timestamp", "N/A")
                                     url = s.get("url", "#")
                                     snippet_text = s.get("text", "")
-                                    st.markdown(f"**[{ts}]({url})** — *\"{snippet_text}\"*")
+                                    sec = s.get("start", 0)
+                                    c_txt, c_seek = st.columns([4, 1])
+                                    with c_txt:
+                                        st.markdown(f"**[{ts}]({url})** — *\"{snippet_text}\"*")
+                                    with c_seek:
+                                        if st.button("▶️ Seek", key=f"seek_n_{j}", help=f"Seek player to {ts}"):
+                                            st.session_state.current_seek = int(sec)
+                                            st.rerun()
 
                         st.session_state.chat_history.append({
                             "role": "assistant",
@@ -603,7 +673,219 @@ else:
                     """, unsafe_allow_html=True)
 
     # ==========================================
-    # TAB 3: EXECUTIVE SUMMARY
+    # TAB 3: STUDY & LEARNING HUB
+    # ==========================================
+    with tab_study:
+        st.subheader("🎓 Study & Concept Learning Hub")
+        st.caption("Master long-form videos with AI-generated comprehension quizzes, concept flashcards, visual knowledge graphs, and printable study briefs.")
+
+        sub_quiz, sub_cards, sub_mindmap, sub_export = st.tabs([
+            "🎯 Knowledge Quiz", 
+            "🃏 Concept Flashcards", 
+            "🗺️ Visual Mind Map", 
+            "📥 1-Click Study Notes Export"
+        ])
+
+        # ------------------------------------------
+        # Sub-tab 1: Interactive Knowledge Quiz
+        # ------------------------------------------
+        with sub_quiz:
+            st.markdown("#### 🎯 Interactive Comprehension Quiz")
+            st.caption("Test your retention and understanding of the key concepts discussed in this video.")
+
+            col_qbtn1, col_qbtn2 = st.columns([3, 1])
+            with col_qbtn1:
+                if st.session_state.quiz_data is None:
+                    if st.button("⚡ Generate 5-Question Comprehension Quiz", type="primary", key="btn_gen_quiz"):
+                        with st.spinner("Formulating high-yield comprehension quiz from video..."):
+                            st.session_state.quiz_data = generate_quiz(
+                                st.session_state.video_id,
+                                st.session_state.full_transcript,
+                                num_questions=5,
+                                provider=provider_choice,
+                                api_key=active_key
+                            )
+                            st.session_state.quiz_submitted = False
+                            st.session_state.quiz_user_answers = {}
+                            st.rerun()
+            with col_qbtn2:
+                if st.session_state.quiz_data is not None:
+                    if st.button("🔄 Regenerate Quiz", key="btn_regen_quiz"):
+                        with st.spinner("Generating fresh quiz questions..."):
+                            st.session_state.quiz_data = generate_quiz(
+                                st.session_state.video_id,
+                                st.session_state.full_transcript,
+                                num_questions=5,
+                                provider=provider_choice,
+                                api_key=active_key
+                            )
+                            st.session_state.quiz_submitted = False
+                            st.session_state.quiz_user_answers = {}
+                            st.rerun()
+
+            if st.session_state.quiz_data:
+                with st.form("quiz_form"):
+                    for q in st.session_state.quiz_data:
+                        qid = q["id"]
+                        ts_ref = q.get("timestamp", "N/A")
+                        st.markdown(f"**Q{qid}. {q['question']}** *(⏱️ Reference: {ts_ref})*")
+                        
+                        ans = st.radio(
+                            "Choose your answer:",
+                            options=q["options"],
+                            key=f"quiz_radio_{qid}",
+                            index=None
+                        )
+                        st.session_state.quiz_user_answers[qid] = ans
+                        st.markdown("<hr style='margin: 8px 0; opacity: 0.15;'>", unsafe_allow_html=True)
+
+                    submit_quiz = st.form_submit_button("✅ Submit Answers & View Results", type="primary")
+
+                if submit_quiz:
+                    st.session_state.quiz_submitted = True
+
+                if st.session_state.quiz_submitted:
+                    total = len(st.session_state.quiz_data)
+                    correct_count = 0
+
+                    st.markdown("---")
+                    st.markdown("### 📊 Quiz Evaluation & Explanations")
+
+                    for q in st.session_state.quiz_data:
+                        qid = q["id"]
+                        user_ans = st.session_state.quiz_user_answers.get(qid)
+                        correct_opt = q["options"][q["answer_index"]]
+                        is_correct = (user_ans == correct_opt)
+
+                        if is_correct:
+                            correct_count += 1
+                            st.success(f"**Q{qid}: Correct!** ✅\n\nYour answer: *{user_ans}*\n\n💡 **Explanation:** {q.get('explanation')}")
+                        else:
+                            st.error(f"**Q{qid}: Incorrect** ❌\n\nYour answer: *{user_ans or 'Not answered'}*\n\n**Correct Answer:** *{correct_opt}*\n\n💡 **Explanation:** {q.get('explanation')}")
+
+                    score_pct = int((correct_count / total) * 100)
+                    st.markdown(f"""
+                    <div class='metric-card' style='text-align:center; margin-top:16px;'>
+                        <div class='metric-label'>Overall Score</div>
+                        <div class='metric-val' style='color:#ff1e56;'>{correct_count} / {total} ({score_pct}%)</div>
+                        <p style='margin-top:6px; opacity:0.8;'>{'🌟 Outstanding mastery!' if score_pct >= 80 else '👍 Good effort! Review the timestamp explanations above to reinforce your learning.'}</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+        # ------------------------------------------
+        # Sub-tab 2: High-Yield Flashcards
+        # ------------------------------------------
+        with sub_cards:
+            st.markdown("#### 🃏 Concept Flashcards")
+            st.caption("Active recall cards capturing high-impact breakthroughs, mental models, and principles.")
+
+            if st.session_state.flashcards_data is None:
+                if st.button("⚡ Generate Concept Flashcards", type="primary", key="btn_gen_cards"):
+                    with st.spinner("Extracting core concept flashcards..."):
+                        st.session_state.flashcards_data = generate_flashcards(
+                            st.session_state.video_id,
+                            st.session_state.full_transcript,
+                            num_cards=6,
+                            provider=provider_choice,
+                            api_key=active_key
+                        )
+                        st.rerun()
+            else:
+                if st.button("🔄 Refresh Flashcards", key="btn_refresh_cards"):
+                    with st.spinner("Synthesizing concept flashcards..."):
+                        st.session_state.flashcards_data = generate_flashcards(
+                            st.session_state.video_id,
+                            st.session_state.full_transcript,
+                            num_cards=6,
+                            provider=provider_choice,
+                            api_key=active_key
+                        )
+                        st.rerun()
+
+                card_cols = st.columns(2)
+                for idx, card in enumerate(st.session_state.flashcards_data):
+                    col = card_cols[idx % 2]
+                    with col:
+                        tag = card.get("tag", "Concept")
+                        ts = card.get("timestamp", "N/A")
+                        front = card.get("front", "")
+                        back = card.get("back", "")
+
+                        with st.container():
+                            st.markdown(f"""
+                            <div class='metric-card' style='min-height: 180px; margin-bottom: 14px;'>
+                                <div style='display:flex; justify-content:space-between; align-items:center;'>
+                                    <span class='badge-pill badge-purple'>🏷️ {tag}</span>
+                                    <span style='font-size:0.80rem; opacity:0.7;'>⏱️ {ts}</span>
+                                </div>
+                                <h4 style='margin: 8px 0 10px 0; font-size: 1.05rem;'>{front}</h4>
+                                <div style='background:rgba(125,125,125,0.08); padding:10px 12px; border-radius:8px; border-left:3px solid #ff1e56;'>
+                                    <strong>💡 Key Insight:</strong> {back}
+                                </div>
+                            </div>
+                            """, unsafe_allow_html=True)
+
+        # ------------------------------------------
+        # Sub-tab 3: Visual Concept Mind Map
+        # ------------------------------------------
+        with sub_mindmap:
+            st.markdown("#### 🗺️ Visual Concept Tree & Mind Map")
+            st.caption("A structural graph of the video's core thesis, pillars, and actionable mechanisms.")
+
+            if st.session_state.mindmap_data is None:
+                if st.button("⚡ Generate Visual Concept Map", type="primary", key="btn_gen_map"):
+                    with st.spinner("Constructing visual concept tree with Mermaid..."):
+                        st.session_state.mindmap_data = generate_mindmap(
+                            st.session_state.video_id,
+                            st.session_state.full_transcript,
+                            provider=provider_choice,
+                            api_key=active_key
+                        )
+                        st.rerun()
+            else:
+                if st.button("🔄 Regenerate Mind Map", key="btn_regen_map"):
+                    with st.spinner("Re-analyzing conceptual hierarchy..."):
+                        st.session_state.mindmap_data = generate_mindmap(
+                            st.session_state.video_id,
+                            st.session_state.full_transcript,
+                            provider=provider_choice,
+                            api_key=active_key
+                        )
+                        st.rerun()
+
+                st.markdown(f"```mermaid\n{st.session_state.mindmap_data}\n```")
+
+        # ------------------------------------------
+        # Sub-tab 4: One-Click Study Notes Export
+        # ------------------------------------------
+        with sub_export:
+            st.markdown("#### 📥 Download Complete Study Notes & Brief")
+            st.caption("Export everything—executive summary, flashcards, comprehension quiz, mind map, and audience feedback—into a clean Markdown document.")
+
+            notes_content = generate_study_notes_markdown(
+                st.session_state.video_meta or {},
+                summary_text=st.session_state.summary,
+                quiz_data=st.session_state.quiz_data,
+                flashcards_data=st.session_state.flashcards_data,
+                mindmap_code=st.session_state.mindmap_data,
+                comments_summary=st.session_state.comments_analysis.get("community_summary") if st.session_state.comments_analysis else None
+            )
+
+            file_prefix = re.sub(r'[^a-zA-Z0-9_-]', '_', (st.session_state.video_meta or {}).get("title", "video")[:30])
+            st.download_button(
+                label="📥 Download Study Notes (.md)",
+                data=notes_content,
+                file_name=f"Study_Notes_{file_prefix}.md",
+                mime="text/markdown",
+                type="primary",
+                use_container_width=True
+            )
+
+            with st.expander("📄 Preview Study Notes Content", expanded=False):
+                st.markdown(notes_content)
+
+    # ==========================================
+    # TAB 4: EXECUTIVE SUMMARY
     # ==========================================
     with tab_summary:
         st.subheader("📋 Executive Video Analysis & Summary")
@@ -625,7 +907,7 @@ else:
                     st.rerun()
 
     # ==========================================
-    # TAB 4: FULL TRANSCRIPT
+    # TAB 5: FULL TRANSCRIPT
     # ==========================================
     with tab_transcript:
         st.subheader("📜 Searchable Video Transcript")
