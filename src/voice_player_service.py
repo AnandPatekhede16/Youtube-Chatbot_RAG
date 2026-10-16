@@ -21,7 +21,7 @@ def render_sync_player_html(video_id: str, start_seconds: int = 0, autoplay: boo
     Renders an embedded, responsive YouTube player that can start at a specific timestamp.
     """
     autoplay_param = "1" if autoplay else "0"
-    embed_url = f"https://www.youtube-nocookie.com/embed/{video_id}?start={int(start_seconds)}&autoplay={autoplay_param}&rel=0&modestbranding=1"
+    embed_url = f"https://www.youtube.com/embed/{video_id}?start={int(start_seconds)}&autoplay={autoplay_param}&enablejsapi=1&rel=0"
 
     return f"""
     <div style="width: 100%; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 16px rgba(0,0,0,0.18); background: #000;">

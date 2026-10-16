@@ -249,6 +249,8 @@ if "summary" not in st.session_state:
     st.session_state.summary = None
 if "current_seek" not in st.session_state:
     st.session_state.current_seek = 0
+if "autoplay" not in st.session_state:
+    st.session_state.autoplay = False
 if "quiz_data" not in st.session_state:
     st.session_state.quiz_data = None
 if "flashcards_data" not in st.session_state:
@@ -277,30 +279,14 @@ with st.sidebar:
 
     load_btn = st.button("🚀 Analyze Video & Audience", use_container_width=True, type="primary")
 
-    # In-Sync Video Player in Sidebar if loaded
+    # Video Card in Sidebar if loaded
     if st.session_state.video_id and st.session_state.video_meta:
         st.markdown("---")
         meta = st.session_state.video_meta
         st.markdown(f"**{meta.get('title', 'Video')}**")
         st.caption(f"👤 Channel: {meta.get('author', 'Unknown')}")
-
-        components.html(
-            render_sync_player_html(
-                st.session_state.video_id, 
-                start_seconds=st.session_state.current_seek,
-                autoplay=(st.session_state.current_seek > 0)
-            ),
-            height=205
-        )
-
-        if st.session_state.current_seek > 0:
-            c_ts, c_rst = st.columns([2, 1])
-            with c_ts:
-                st.caption(f"⏱️ Playing: **{format_timestamp(st.session_state.current_seek)}**")
-            with c_rst:
-                if st.button("⏮️ 00:00", help="Reset player to beginning"):
-                    st.session_state.current_seek = 0
-                    st.rerun()
+        if meta.get("thumbnail_url"):
+            st.image(meta["thumbnail_url"], use_container_width=True)
 
         is_cached = is_video_indexed(st.session_state.video_id, provider=AI_PROVIDER)
         st.markdown(
@@ -386,6 +372,7 @@ with st.sidebar:
                     st.session_state.chat_history = []
                     st.session_state.summary = None
                     st.session_state.current_seek = 0
+                    st.session_state.autoplay = False
                     st.session_state.quiz_data = None
                     st.session_state.flashcards_data = None
                     st.session_state.mindmap_data = None
@@ -454,110 +441,170 @@ else:
     ])
 
     # ==========================================
-    # TAB 1: INTERACTIVE CHAT
+    # TAB 1: INTERACTIVE CHAT & IN-SYNC PLAYER
     # ==========================================
     with tab_chat:
-        st.caption(f"Actively exploring: **{st.session_state.video_meta.get('title')}**")
+        col_player, col_chat = st.columns([5, 6], gap="large")
 
-        # Suggested Questions
-        st.markdown("**💡 Quick Test Prompts:**")
-        col_q1, col_q2, col_q3 = st.columns(3)
-        sample_q = None
-        with col_q1:
-            if st.button("🧠 Multitasking vs Task Switching?", use_container_width=True):
-                sample_q = "What does she say about multitasking versus task switching?"
-        with col_q2:
-            if st.button("📱 Why Phone on Table Lowers IQ?", use_container_width=True):
-                sample_q = "Why does having a phone visible on the table decrease IQ and focus?"
-        with col_q3:
-            if st.button("🗣️ What did viewers say in comments?", use_container_width=True):
-                sample_q = "What are viewers in the comments saying about this discussion?"
+        # ------------------------------------------
+        # LEFT: ACTIVE IN-SYNC VIDEO PLAYER (ON-SCREEN)
+        # ------------------------------------------
+        with col_player:
+            st.markdown(f"#### 📺 {st.session_state.video_meta.get('title', 'Video Player')}")
+            st.caption(f"👤 Channel: **{st.session_state.video_meta.get('author', 'Unknown')}**")
 
-        # Voice Dictation Widget
-        components.html(render_voice_input_html(), height=85)
+            # Active In-Sync Video Player directly in this tab!
+            components.html(
+                render_sync_player_html(
+                    st.session_state.video_id, 
+                    start_seconds=st.session_state.current_seek,
+                    autoplay=st.session_state.autoplay
+                ),
+                height=345
+            )
 
-        # Display Chat History
-        for i, item in enumerate(st.session_state.chat_history):
-            role = item["role"]
-            content = item["content"]
-            sources = item.get("sources", [])
+            # Playhead status & reset controls
+            if st.session_state.current_seek > 0:
+                c_seek_txt, c_seek_rst = st.columns([3, 1])
+                with c_seek_txt:
+                    st.success(f"▶️ Playing from **{format_timestamp(st.session_state.current_seek)}**")
+                with c_seek_rst:
+                    if st.button("⏮️ 00:00", help="Reset player to beginning", key="seek_rst_player"):
+                        st.session_state.current_seek = 0
+                        st.session_state.autoplay = False
+                        st.rerun()
+            else:
+                st.caption("💡 *Click any '▶️ Play' button next to an answer to immediately start playing at that timestamp!*")
 
-            with st.chat_message(role):
-                st.markdown(content)
-                if role == "assistant" and not content.startswith("❌"):
-                    components.html(render_tts_player_html(content, button_id=f"hist_{i}"), height=36)
+            # Latest Cited Moments Quick Jump Bar
+            latest_sources = []
+            for m in reversed(st.session_state.chat_history):
+                if m.get("sources"):
+                    latest_sources = m["sources"]
+                    break
 
-                if sources:
-                    with st.expander("📌 View Timestamp Citations & In-Sync Seek", expanded=False):
-                        for j, s in enumerate(sources):
-                            ts = s.get("timestamp", "N/A")
-                            url = s.get("url", "#")
-                            snippet_text = s.get("text", "")
-                            sec = s.get("start", 0)
-                            c_txt, c_seek = st.columns([4, 1])
-                            with c_txt:
-                                st.markdown(f"**[{ts}]({url})** — *\"{snippet_text}\"*")
-                            with c_seek:
-                                if st.button("▶️ Seek", key=f"seek_h_{i}_{j}", help=f"Seek player to {ts}"):
-                                    st.session_state.current_seek = int(sec)
-                                    st.rerun()
+            if latest_sources:
+                st.markdown("**⚡ Quick Jump to Cited Moments:**")
+                jump_cols = st.columns(min(len(latest_sources), 3))
+                for idx, src in enumerate(latest_sources[:3]):
+                    with jump_cols[idx]:
+                        ts_label = src.get("timestamp", "00:00")
+                        s_sec = src.get("start", 0)
+                        if st.button(f"▶️ {ts_label}", key=f"quick_jump_{idx}", use_container_width=True):
+                            st.session_state.current_seek = int(s_sec)
+                            st.session_state.autoplay = True
+                            st.rerun()
 
-        # Chat Input
-        user_query = st.chat_input("Ask any question about the video or audience comments...")
-        prompt_to_send = sample_q or user_query
+        # ------------------------------------------
+        # RIGHT: CHAT, VOICE & CITATIONS
+        # ------------------------------------------
+        with col_chat:
+            # Suggested Questions
+            st.markdown("**💡 Quick Test Prompts:**")
+            col_q1, col_q2, col_q3 = st.columns(3)
+            sample_q = None
+            with col_q1:
+                if st.button("🧠 Multitasking?", use_container_width=True):
+                    sample_q = "What does she say about multitasking versus task switching?"
+            with col_q2:
+                if st.button("📱 Phone on Table?", use_container_width=True):
+                    sample_q = "Why does having a phone visible on the table decrease IQ and focus?"
+            with col_q3:
+                if st.button("🗣️ Viewer Reactions?", use_container_width=True):
+                    sample_q = "What are viewers in the comments saying about this discussion?"
 
-        if prompt_to_send:
-            st.session_state.chat_history.append({"role": "user", "content": prompt_to_send})
-            with st.chat_message("user"):
-                st.markdown(prompt_to_send)
+            # Voice Dictation Widget
+            components.html(render_voice_input_html(), height=80)
 
-            with st.chat_message("assistant"):
-                with st.spinner("Searching transcript cues & audience insights..."):
-                    formatted_hist = [
-                        (m["content"], m.get("content", "")) 
-                        for m in st.session_state.chat_history[:-1] 
-                        if m["role"] == "user"
-                    ]
-                    
-                    try:
-                        result = st.session_state.rag_engine.ask(
-                            prompt_to_send, 
-                            chat_history=formatted_hist
-                        )
-                        answer = result["answer"]
-                        sources = result["sources"]
+            # Scrollable Chat Container
+            chat_box = st.container(height=480)
+            with chat_box:
+                for i, item in enumerate(st.session_state.chat_history):
+                    role = item["role"]
+                    content = item["content"]
+                    sources = item.get("sources", [])
 
-                        st.markdown(answer)
-                        components.html(render_tts_player_html(answer, button_id=f"new_{len(st.session_state.chat_history)}"), height=36)
+                    with st.chat_message(role):
+                        st.markdown(content)
+                        if role == "assistant" and not content.startswith("❌"):
+                            components.html(render_tts_player_html(content, button_id=f"hist_{i}"), height=36)
 
                         if sources:
-                            with st.expander("📌 View Timestamp Citations & In-Sync Seek", expanded=False):
+                            with st.expander("📌 Timestamp Citations (Click to Play On-Screen)", expanded=True):
                                 for j, s in enumerate(sources):
                                     ts = s.get("timestamp", "N/A")
                                     url = s.get("url", "#")
                                     snippet_text = s.get("text", "")
                                     sec = s.get("start", 0)
-                                    c_txt, c_seek = st.columns([4, 1])
+                                    c_txt, c_seek = st.columns([3, 1])
                                     with c_txt:
                                         st.markdown(f"**[{ts}]({url})** — *\"{snippet_text}\"*")
                                     with c_seek:
-                                        if st.button("▶️ Seek", key=f"seek_n_{j}", help=f"Seek player to {ts}"):
+                                        if st.button(f"▶️ Play {ts}", key=f"seek_h_{i}_{j}", type="primary", use_container_width=True):
                                             st.session_state.current_seek = int(sec)
+                                            st.session_state.autoplay = True
                                             st.rerun()
 
-                        st.session_state.chat_history.append({
-                            "role": "assistant",
-                            "content": answer,
-                            "sources": sources
-                        })
-                    except Exception as e:
-                        err_msg = f"❌ Error generating response: {str(e)}"
-                        st.error(err_msg)
-                        st.session_state.chat_history.append({
-                            "role": "assistant",
-                            "content": err_msg,
-                            "sources": []
-                        })
+            # Chat Input
+            user_query = st.chat_input("Ask any question about the video or audience comments...")
+            prompt_to_send = sample_q or user_query
+
+            if prompt_to_send:
+                st.session_state.chat_history.append({"role": "user", "content": prompt_to_send})
+                with chat_box:
+                    with st.chat_message("user"):
+                        st.markdown(prompt_to_send)
+
+                    with st.chat_message("assistant"):
+                        with st.spinner("Searching transcript cues & audience insights..."):
+                            formatted_hist = [
+                                (m["content"], m.get("content", "")) 
+                                for m in st.session_state.chat_history[:-1] 
+                                if m["role"] == "user"
+                            ]
+                            
+                            try:
+                                result = st.session_state.rag_engine.ask(
+                                    prompt_to_send, 
+                                    chat_history=formatted_hist
+                                )
+                                answer = result["answer"]
+                                sources = result["sources"]
+
+                                st.markdown(answer)
+                                components.html(render_tts_player_html(answer, button_id=f"new_{len(st.session_state.chat_history)}"), height=36)
+
+                                if sources:
+                                    with st.expander("📌 Timestamp Citations (Click to Play On-Screen)", expanded=True):
+                                        for j, s in enumerate(sources):
+                                            ts = s.get("timestamp", "N/A")
+                                            url = s.get("url", "#")
+                                            snippet_text = s.get("text", "")
+                                            sec = s.get("start", 0)
+                                            c_txt, c_seek = st.columns([3, 1])
+                                            with c_txt:
+                                                st.markdown(f"**[{ts}]({url})** — *\"{snippet_text}\"*")
+                                            with c_seek:
+                                                if st.button(f"▶️ Play {ts}", key=f"seek_n_{j}", type="primary", use_container_width=True):
+                                                    st.session_state.current_seek = int(sec)
+                                                    st.session_state.autoplay = True
+                                                    st.rerun()
+
+                                st.session_state.chat_history.append({
+                                    "role": "assistant",
+                                    "content": answer,
+                                    "sources": sources
+                                })
+                                st.rerun()
+                            except Exception as e:
+                                err_msg = f"❌ Error generating response: {str(e)}"
+                                st.error(err_msg)
+                                st.session_state.chat_history.append({
+                                    "role": "assistant",
+                                    "content": err_msg,
+                                    "sources": []
+                                })
+                                st.rerun()
 
     # ==========================================
     # TAB 2: AUDIENCE & COMMENTS HUB
