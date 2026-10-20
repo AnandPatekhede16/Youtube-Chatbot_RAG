@@ -155,7 +155,8 @@ def generate_viral_clips(
     num_clips: int = 4,
     force_refresh: bool = False,
     provider: str = AI_PROVIDER,
-    api_key: Optional[str] = None
+    api_key: Optional[str] = None,
+    **kwargs
 ) -> List[Dict[str, Any]]:
     """
     Identifies top viral short-form moments with hooks, virality scores, and captions.
@@ -244,7 +245,8 @@ def generate_social_thread(
     platform: str = "twitter",
     force_refresh: bool = False,
     provider: str = AI_PROVIDER,
-    api_key: Optional[str] = None
+    api_key: Optional[str] = None,
+    **kwargs
 ) -> Dict[str, Any]:
     """
     Generates a viral Twitter thread or LinkedIn post.
@@ -335,7 +337,8 @@ def generate_seo_blog(
     video_metadata: Dict[str, Any],
     force_refresh: bool = False,
     provider: str = AI_PROVIDER,
-    api_key: Optional[str] = None
+    api_key: Optional[str] = None,
+    **kwargs
 ) -> str:
     """
     Generates a full 1,200 - 1,500 word SEO-optimized blog post in Markdown format.

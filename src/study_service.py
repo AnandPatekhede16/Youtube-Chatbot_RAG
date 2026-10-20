@@ -121,7 +121,8 @@ def generate_quiz(
     num_questions: int = 5,
     force_refresh: bool = False,
     provider: str = AI_PROVIDER,
-    api_key: Optional[str] = None
+    api_key: Optional[str] = None,
+    **kwargs
 ) -> List[Dict[str, Any]]:
     """
     Generates or loads a cached multiple-choice knowledge quiz from video transcript.
@@ -210,7 +211,8 @@ def generate_flashcards(
     num_cards: int = 6,
     force_refresh: bool = False,
     provider: str = AI_PROVIDER,
-    api_key: Optional[str] = None
+    api_key: Optional[str] = None,
+    **kwargs
 ) -> List[Dict[str, Any]]:
     """
     Generates or loads cached concept flashcards from video transcript.
@@ -285,7 +287,8 @@ def generate_mindmap(
     transcript_text: str,
     force_refresh: bool = False,
     provider: str = AI_PROVIDER,
-    api_key: Optional[str] = None
+    api_key: Optional[str] = None,
+    **kwargs
 ) -> str:
     """
     Generates or loads a cached Mermaid.js concept flowchart.
@@ -361,11 +364,12 @@ def generate_mindmap(
 
 def generate_study_notes_markdown(
     video_meta: Dict[str, Any],
-    summary_text: Optional[str],
-    quiz_data: Optional[List[Dict[str, Any]]],
-    flashcards_data: Optional[List[Dict[str, Any]]],
-    mindmap_code: Optional[str],
-    comments_summary: Optional[str] = None
+    summary_text: Optional[str] = None,
+    quiz_data: Optional[List[Dict[str, Any]]] = None,
+    flashcards_data: Optional[List[Dict[str, Any]]] = None,
+    mindmap_code: Optional[str] = None,
+    comments_summary: Optional[str] = None,
+    **kwargs
 ) -> str:
     """
     Assembles a complete, structured, printable study guide in Markdown.

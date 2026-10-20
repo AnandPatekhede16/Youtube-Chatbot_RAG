@@ -162,7 +162,7 @@ Audience Comments Intelligence:
 - Top Questions Asked by Viewers: {questions}
 """
 
-    def ask(self, question: str, chat_history: List[Tuple[str, str]] = None) -> Dict[str, Any]:
+    def ask(self, question: str, chat_history: List[Tuple[str, str]] = None, **kwargs) -> Dict[str, Any]:
         """
         Answers a user question considering past chat history.
         Uses resilient fallback to eliminate 503 errors.
@@ -233,7 +233,7 @@ Audience Comments Intelligence:
             "retrieved_query": query_to_retrieve
         }
 
-    def generate_summary(self, full_transcript_text: str) -> str:
+    def generate_summary(self, full_transcript_text: str, **kwargs) -> str:
         """
         Generates a comprehensive structured summary of the entire video.
         """
