@@ -1,6 +1,7 @@
 import streamlit as st
 import time
 import re
+import json
 from typing import List, Dict, Any, Optional
 
 from src.config import (
@@ -9,6 +10,7 @@ from src.config import (
     GEMINI_API_KEY, 
     OPENAI_API_KEY,
     GROQ_API_KEY,
+    STUDY_DIR,
     REPURPOSE_DIR
 )
 from src.youtube_service import (
