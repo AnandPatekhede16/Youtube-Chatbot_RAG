@@ -83,7 +83,7 @@ def invoke_with_resilience(chain_builder_func, inputs: Dict[str, Any], provider:
                     kwargs = {
                         "model": model_name,
                         "google_api_key": active_key,
-                        "timeout": 30
+                        "timeout": 60
                     }
                     if "flash-lite" not in model_name:
                         kwargs["temperature"] = 0.2

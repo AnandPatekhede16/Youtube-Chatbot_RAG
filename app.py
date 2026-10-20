@@ -8,7 +8,8 @@ from src.config import (
     AI_PROVIDER, 
     GEMINI_API_KEY, 
     OPENAI_API_KEY,
-    GROQ_API_KEY
+    GROQ_API_KEY,
+    REPURPOSE_DIR
 )
 from src.youtube_service import (
     extract_video_id,
@@ -31,6 +32,17 @@ from src.voice_player_service import (
     render_sync_player_html,
     render_voice_input_html,
     render_tts_player_html
+)
+from src.history_service import (
+    load_history,
+    add_to_history,
+    delete_history_item,
+    clear_all_history
+)
+from src.repurpose_service import (
+    generate_viral_clips,
+    generate_social_thread,
+    generate_seo_blog
 )
 import streamlit.components.v1 as components
 
@@ -262,6 +274,16 @@ if "quiz_submitted" not in st.session_state:
     st.session_state.quiz_submitted = False
 if "quiz_user_answers" not in st.session_state:
     st.session_state.quiz_user_answers = {}
+if "viral_clips" not in st.session_state:
+    st.session_state.viral_clips = None
+if "social_threads" not in st.session_state:
+    st.session_state.social_threads = {}
+if "seo_blog" not in st.session_state:
+    st.session_state.seo_blog = None
+if "url_input_value" not in st.session_state:
+    st.session_state.url_input_value = "https://www.youtube.com/watch?v=4Vz6L8B73i4"
+if "auto_load_vid" not in st.session_state:
+    st.session_state.auto_load_vid = None
 
 # 4. Sidebar: Clean, Sleek SaaS Layout
 with st.sidebar:
@@ -272,7 +294,7 @@ with st.sidebar:
     st.markdown("#### 🔗 Load YouTube Video")
     url_input = st.text_input(
         "Paste YouTube URL or Video ID",
-        value="https://www.youtube.com/watch?v=4Vz6L8B73i4",
+        value=st.session_state.url_input_value,
         placeholder="https://www.youtube.com/watch?v=..."
     )
 
@@ -298,6 +320,31 @@ with st.sidebar:
         if st.session_state.comments:
             st.markdown(f"<span class='badge-pill badge-purple'>💬 {len(st.session_state.comments)} Comments Analyzed</span>", unsafe_allow_html=True)
 
+    # 🕒 History / Recent Analyses in Sidebar
+    history_items = load_history()
+    if history_items:
+        st.markdown("---")
+        with st.expander(f"🕒 Recent History ({len(history_items)})", expanded=False):
+            st.caption("Past analyzed videos cached on disk:")
+            for item in history_items:
+                h_vid = item.get("video_id")
+                h_title = item.get("title", f"Video {h_vid}")
+                short_title = (h_title[:38] + '...') if len(h_title) > 40 else h_title
+                col_h1, col_h2 = st.columns([5, 1])
+                with col_h1:
+                    if st.button(f"📹 {short_title}", key=f"hist_btn_{h_vid}", help=h_title):
+                        st.session_state.auto_load_vid = h_vid
+                        st.session_state.url_input_value = f"https://www.youtube.com/watch?v={h_vid}"
+                        st.rerun()
+                with col_h2:
+                    if st.button("🗑️", key=f"hist_del_{h_vid}", help="Delete from history"):
+                        delete_history_item(h_vid)
+                        st.rerun()
+
+            if st.button("🧹 Clear All History", key="btn_clear_hist", use_container_width=True):
+                clear_all_history()
+                st.rerun()
+
     st.markdown("---")
     # AI Model & API Configuration cleanly tucked at bottom of sidebar
     with st.expander("⚙️ AI Model Configuration", expanded=False):
@@ -316,8 +363,17 @@ with st.sidebar:
         groq_key_input = st.text_input("Groq API Key (Fast Whisper Fallback)", value=GROQ_API_KEY, type="password")
 
     # Processing Logic
-    if load_btn:
-        vid = extract_video_id(url_input)
+    trigger_process = load_btn or (st.session_state.auto_load_vid is not None)
+    if trigger_process:
+        if st.session_state.auto_load_vid:
+            vid = st.session_state.auto_load_vid
+            st.session_state.auto_load_vid = None
+            url_input = f"https://www.youtube.com/watch?v={vid}"
+            st.session_state.url_input_value = url_input
+        else:
+            vid = extract_video_id(url_input)
+            st.session_state.url_input_value = url_input
+
         if not vid:
             st.error("❌ Please provide a valid YouTube URL or 11-character video ID.")
         elif not active_key or active_key.startswith("your_"):
@@ -386,6 +442,12 @@ with st.sidebar:
                     st.session_state.mindmap_data = None
                     st.session_state.quiz_submitted = False
                     st.session_state.quiz_user_answers = {}
+                    st.session_state.viral_clips = None
+                    st.session_state.social_threads = {}
+                    st.session_state.seo_blog = None
+
+                    # Add to persistent history
+                    add_to_history(vid, meta)
 
                     st.success("✅ Analysis ready!")
                     st.rerun()
@@ -443,10 +505,11 @@ else:
         st.info(f"ℹ️ **Note:** Speech subtitles were disabled by the creator for this video. TubeMind AI automatically recovered **{ch_count} Video Chapters & Timestamps** plus **Audience Comments** so complete Q&A, chapter navigation, and social listening work seamlessly!")
 
     # 7. Main Feature Tabs
-    tab_chat, tab_comments, tab_study, tab_summary, tab_transcript = st.tabs([
+    tab_chat, tab_comments, tab_study, tab_repurpose, tab_summary, tab_transcript = st.tabs([
         "💬 Video & Audience Q&A", 
         "🗣️ Audience & Comments Hub", 
         "🎓 Study & Learning Hub",
+        "⚡ Content Repurposer",
         "📋 Executive Summary", 
         "📜 Searchable Transcript"
     ])
@@ -943,7 +1006,244 @@ else:
                 st.markdown(notes_content)
 
     # ==========================================
-    # TAB 4: EXECUTIVE SUMMARY
+    # TAB 4: CONTENT REPURPOSER (TOPIC 2)
+    # ==========================================
+    with tab_repurpose:
+        st.subheader("⚡ AI Content Repurposing Engine")
+        st.caption("Repurpose high-yield video insights into viral short-form clips, Twitter/LinkedIn threads, and full SEO blog posts.")
+
+        rep_shorts, rep_threads, rep_blog = st.tabs([
+            "🎬 Viral Shorts & Reels Hooks",
+            "🧵 Viral Social Threads (X / LinkedIn)",
+            "📝 1,500-Word SEO Blog Post"
+        ])
+
+        # ------------------------------------------
+        # Sub-tab 1: Viral Shorts & Reels Hooks
+        # ------------------------------------------
+        with rep_shorts:
+            st.markdown("#### 🎬 High-Retention Shorts & Reels Moments")
+            st.caption("AI-detected emotional peaks, pattern interrupts, and contrarian insights with second-level timestamps.")
+
+            if st.session_state.viral_clips is None:
+                cached_clips_file = REPURPOSE_DIR / f"{st.session_state.video_id}_viral_clips.json"
+                if cached_clips_file.exists():
+                    try:
+                        with open(cached_clips_file, "r", encoding="utf-8") as f:
+                            st.session_state.viral_clips = json.load(f)
+                    except Exception:
+                        pass
+
+            if st.session_state.viral_clips is None:
+                if st.button("🚀 Find Viral Moments & Hooks", type="primary", key="btn_gen_clips"):
+                    with st.spinner("Scanning transcript for high-virality hooks & pattern interrupts..."):
+                        st.session_state.viral_clips = generate_viral_clips(
+                            st.session_state.video_id,
+                            st.session_state.full_transcript,
+                            num_clips=4,
+                            provider=provider_choice,
+                            api_key=active_key
+                        )
+                        st.rerun()
+            else:
+                col_ctrl_a, col_ctrl_b = st.columns([4, 1])
+                with col_ctrl_a:
+                    st.success(f"✨ Found {len(st.session_state.viral_clips)} High-Virality Clip Candidates!")
+                with col_ctrl_b:
+                    if st.button("🔄 Regenerate", key="btn_regen_clips"):
+                        with st.spinner("Finding fresh viral angles..."):
+                            st.session_state.viral_clips = generate_viral_clips(
+                                st.session_state.video_id,
+                                st.session_state.full_transcript,
+                                num_clips=4,
+                                provider=provider_choice,
+                                api_key=active_key
+                            )
+                            st.rerun()
+
+                for clip in st.session_state.viral_clips:
+                    c_id = clip.get("id", 1)
+                    title = clip.get("hook_title", "Viral Clip")
+                    start_t = clip.get("start_time", "00:00")
+                    end_t = clip.get("end_time", "01:00")
+                    start_s = clip.get("start_seconds", 0)
+                    dur = clip.get("duration_seconds", 60)
+                    score = clip.get("virality_score", 90)
+                    hook_type = clip.get("hook_type", "Insight")
+                    punchline = clip.get("key_punchline", "")
+                    why = clip.get("why_it_works", "")
+                    caption = clip.get("recommended_caption", "")
+
+                    with st.container():
+                        st.markdown(f"""
+                        <div class='metric-card' style='margin-bottom: 16px; border-left: 4px solid #ff1e56;'>
+                            <div style='display:flex; justify-content:space-between; align-items:center;'>
+                                <span class='badge-pill badge-green'>🔥 Virality Score: {score}/100</span>
+                                <span class='badge-pill badge-purple'>🎯 {hook_type}</span>
+                                <span style='font-size:0.85rem; font-weight:600;'>⏱️ [{start_t} - {end_t}] ({dur}s)</span>
+                            </div>
+                            <h3 style='margin: 8px 0; font-size: 1.15rem;'>{title}</h3>
+                            <div style='background:rgba(125,125,125,0.08); padding:10px 14px; border-radius:8px; margin: 8px 0;'>
+                                <strong>💥 Core Punchline / Hook:</strong> "{punchline}"
+                            </div>
+                            <p style='color:#64748b; font-size:0.90rem; margin: 6px 0;'>
+                                <strong>🧠 Why it Hooks:</strong> {why}
+                            </p>
+                        </div>
+                        """, unsafe_allow_html=True)
+
+                        c_btn, c_cap = st.columns([2, 5])
+                        with c_btn:
+                            if st.button(f"▶️ Seek to {start_t}", key=f"seek_clip_{c_id}_{start_s}"):
+                                st.session_state.current_seek = int(start_s)
+                                st.session_state.autoplay = True
+                                st.rerun()
+                        with c_cap:
+                            with st.expander("📋 Copy Ready-to-Post Caption", expanded=False):
+                                st.code(caption, language="markdown")
+
+        # ------------------------------------------
+        # Sub-tab 2: Viral Social Threads
+        # ------------------------------------------
+        with rep_threads:
+            st.markdown("#### 🧵 Viral Social Threads & Thought Leadership")
+            st.caption("Transform dense podcast dialogues into high-converting Twitter (X) threads or viral LinkedIn carousels.")
+
+            platform_choice = st.radio(
+                "Select Target Platform:",
+                options=["Twitter (X) Thread", "LinkedIn Thought Leadership Post"],
+                horizontal=True
+            )
+            plat_key = "twitter" if "Twitter" in platform_choice else "linkedin"
+
+            thread_cache = REPURPOSE_DIR / f"{st.session_state.video_id}_{plat_key}_thread.json"
+            if plat_key not in st.session_state.social_threads and thread_cache.exists():
+                try:
+                    with open(thread_cache, "r", encoding="utf-8") as f:
+                        st.session_state.social_threads[plat_key] = json.load(f)
+                except Exception:
+                    pass
+
+            thread_data = st.session_state.social_threads.get(plat_key)
+
+            if thread_data is None:
+                if st.button(f"🚀 Generate {platform_choice}", type="primary", key=f"btn_gen_{plat_key}"):
+                    with st.spinner(f"Drafting high-engagement {platform_choice} with AI..."):
+                        t_data = generate_social_thread(
+                            st.session_state.video_id,
+                            st.session_state.full_transcript,
+                            platform=plat_key,
+                            provider=provider_choice,
+                            api_key=active_key
+                        )
+                        st.session_state.social_threads[plat_key] = t_data
+                        st.rerun()
+            else:
+                if st.button(f"🔄 Regenerate {platform_choice}", key=f"btn_regen_{plat_key}"):
+                    with st.spinner(f"Rewriting {platform_choice}..."):
+                        t_data = generate_social_thread(
+                            st.session_state.video_id,
+                            st.session_state.full_transcript,
+                            platform=plat_key,
+                            provider=provider_choice,
+                            api_key=active_key
+                        )
+                        st.session_state.social_threads[plat_key] = t_data
+                        st.rerun()
+
+                if plat_key == "twitter":
+                    headline = thread_data.get("hook_headline", "Viral Thread")
+                    tweets = thread_data.get("tweets", [])
+                    hashtags = " ".join(thread_data.get("recommended_hashtags", []))
+
+                    st.markdown(f"### 🧵 {headline}")
+                    st.caption(f"⏱️ Read Time: {thread_data.get('estimated_read_time', '2 mins')} | {len(tweets)} Tweets")
+
+                    for t_idx, tweet in enumerate(tweets, 1):
+                        st.markdown(f"""
+                        <div class='comment-card' style='margin-bottom: 10px;'>
+                            <div style='display:flex; justify-content:space-between; margin-bottom: 6px;'>
+                                <span class='badge-pill badge-blue'>Tweet {t_idx}/{len(tweets)}</span>
+                            </div>
+                            <div style='font-size: 0.95rem; line-height: 1.5; white-space: pre-wrap;'>{tweet}</div>
+                        </div>
+                        """, unsafe_allow_html=True)
+
+                    full_thread_text = "\n\n---\n\n".join([f"[{i+1}/{len(tweets)}]\n{t}" for i, t in enumerate(tweets)]) + f"\n\n{hashtags}"
+                    with st.expander("📋 Copy Entire Thread as Clean Text"):
+                        st.code(full_thread_text, language="text")
+
+                else:
+                    post_title = thread_data.get("post_title", "LinkedIn Post")
+                    post_text = thread_data.get("full_post_text", "")
+
+                    st.markdown(f"### 💼 {post_title}")
+                    st.markdown(f"""
+                    <div class='comment-card' style='padding: 20px; font-size: 0.98rem; line-height: 1.6; white-space: pre-wrap;'>
+{post_text}
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                    with st.expander("📋 Copy Full LinkedIn Post"):
+                        st.code(post_text, language="text")
+
+        # ------------------------------------------
+        # Sub-tab 3: SEO Blog Post
+        # ------------------------------------------
+        with rep_blog:
+            st.markdown("#### 📝 Full 1,500-Word SEO-Optimized Blog Post")
+            st.caption("A publication-ready, deeply researched article complete with Google search meta description, subheadings, pull quotes, and FAQ schema.")
+
+            blog_cache = REPURPOSE_DIR / f"{st.session_state.video_id}_seo_blog.md"
+            if st.session_state.seo_blog is None and blog_cache.exists():
+                try:
+                    with open(blog_cache, "r", encoding="utf-8") as f:
+                        st.session_state.seo_blog = f.read()
+                except Exception:
+                    pass
+
+            if st.session_state.seo_blog is None:
+                if st.button("🚀 Generate 1,500-Word SEO Blog Post", type="primary", key="btn_gen_blog"):
+                    with st.spinner("Authoring publication-ready SEO blog post with Google rank structure..."):
+                        b_text = generate_seo_blog(
+                            st.session_state.video_id,
+                            st.session_state.full_transcript,
+                            st.session_state.video_meta or {},
+                            provider=provider_choice,
+                            api_key=active_key
+                        )
+                        st.session_state.seo_blog = b_text
+                        st.rerun()
+            else:
+                c_dl, c_reg = st.columns([3, 1])
+                with c_dl:
+                    file_prefix = re.sub(r'[^a-zA-Z0-9_-]', '_', (st.session_state.video_meta or {}).get("title", "video")[:30])
+                    st.download_button(
+                        label="📥 Download Blog Post (.md)",
+                        data=st.session_state.seo_blog,
+                        file_name=f"Blog_Post_{file_prefix}.md",
+                        mime="text/markdown",
+                        type="primary",
+                        use_container_width=True
+                    )
+                with c_reg:
+                    if st.button("🔄 Regenerate", key="btn_regen_blog", use_container_width=True):
+                        with st.spinner("Re-writing SEO blog post..."):
+                            b_text = generate_seo_blog(
+                                st.session_state.video_id,
+                                st.session_state.full_transcript,
+                                st.session_state.video_meta or {},
+                                provider=provider_choice,
+                                api_key=active_key
+                            )
+                            st.session_state.seo_blog = b_text
+                            st.rerun()
+
+                st.markdown("---")
+                st.markdown(st.session_state.seo_blog)
+
+    # ==========================================
+    # TAB 5: EXECUTIVE SUMMARY
     # ==========================================
     with tab_summary:
         st.subheader("📋 Executive Video Analysis & Summary")

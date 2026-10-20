@@ -91,15 +91,25 @@ chunks = RecursiveCharacterTextSplitter().create_documents([transcript])
 * **Speech-to-Text Voice Dictation**: Web Speech API dictation widget (`🎙️ Ask with Voice`) for hands-free speech question input.
 * **Text-to-Speech Audio Playback**: Browser-native `window.speechSynthesis` (`🔊 Listen to Answer`) that reads AI answers aloud in natural audio.
 
-### 7. 💾 Instant Local Disk Caching
-* Raw transcripts, parsed comments, audience intelligence reports, study materials, and FAISS vector databases are saved locally in `storage/`.
+### 7. ⚡ AI Content Repurposing Engine (Creators & Marketers)
+* **Viral Shorts & Reels Clip Finder**: Scans dialogues for pattern interrupts, contrarian claims, and high-retention stories with start/end timestamps, virality scores (out of 100), key punchlines, and copyable social captions.
+* **Viral Twitter (X) & LinkedIn Threads**: Converts 2-hour podcasts into high-converting 7-9 tweet threads or LinkedIn thought leadership posts with hooks, takeaways, and hashtags.
+* **1,500-Word SEO Blog Post Generator**: Generates full publication-ready articles with H1/H2 subheadings, meta descriptions, pull quotes, FAQ schema, and 1-click Markdown download.
+
+### 8. 🕒 Persistent Analysis History & Instant Reload
+* **Disk-Persisted Video History**: Automatically logs analyzed videos with thumbnails, titles, and timestamps into `storage/history.json`.
+* **Instant 0.05s Reload**: Select any past video from the sidebar to instantly switch to it without re-transcribing or re-embedding.
+* **Automatic Backfill**: Discovers previously cached transcripts and adds them to history on first load.
+
+### 9. 💾 Instant Local Disk Caching
+* Raw transcripts, parsed comments, audience intelligence reports, study materials, repurpose assets, and FAISS vector databases are saved locally in `storage/`.
 * Re-opening a previously analyzed video loads in **0.05 seconds** with **$0 API cost**.
 
-### 8. 🎨 Sleek Modern SaaS Web Interface
+### 10. 🎨 Sleek Modern SaaS Web Interface
 * Modern dark/light theme adaptive CSS.
 * Clean Streamlit header without default hamburger menus, deploy buttons, or footers.
 * Prominent, collapsible sidebar with smooth toggle controls.
-* Clean layout: Primary controls at top, in-sync player in center, and API settings tucked cleanly at the bottom.
+* Clean layout: Primary controls at top, in-sync player in center, history drawer, and API settings tucked cleanly at the bottom.
 
 ---
 
@@ -182,23 +192,28 @@ D:\Youtube Chatbot\
 │   ├── comments_service.py        # Public comments scraper via YouTube InnerTube
 │   ├── comments_analyzer.py       # Audience sentiment, debates, and community consensus
 │   ├── study_service.py           # Quizzes, flashcards, Mermaid mind map, study notes export
+│   ├── repurpose_service.py       # Viral Shorts finder, X/LinkedIn threads, SEO blog post engine
+│   ├── history_service.py         # Persistent session tracking & instant video reload
 │   ├── voice_player_service.py    # In-sync embedded video player, Web Speech API mic & TTS
 │   ├── text_processor.py          # TimestampAwareChunker preserving second offsets
 │   ├── vectorstore.py             # FAISS vector store with rate-limit safe batching
 │   └── rag_engine.py              # Conversational RAG with multi-model fallback chain
 │
 ├── storage/                       # Local persistent cache directory (git-ignored)
+│   ├── history.json               # Persisted user analysis history (JSON)
 │   ├── transcripts/               # Cached video subtitles and chapters (JSON)
 │   ├── comments/                  # Cached public viewer comments (JSON)
 │   ├── comments_analysis/         # Cached audience sentiment reports (JSON)
 │   ├── study/                     # Cached quizzes, flashcards, and mind maps (JSON)
+│   ├── repurpose/                 # Cached viral clips, social threads, and SEO blogs
 │   ├── temp_audio/                # Temporary streaming audio buffer (auto-cleaned)
 │   └── vectors/                   # Cached FAISS index and docstore files
 │
 └── tests/                         # Automated testing suite
     ├── test_pipeline.py           # End-to-end integration and fallback tests
     ├── test_audio_fallback.py     # Unit tests for Whisper audio extraction & fallback
-    └── test_study_and_player.py   # Unit tests for voice, player, and study components
+    ├── test_study_and_player.py   # Unit tests for voice, player, and study components
+    └── test_repurpose_and_history.py # Unit tests for repurposing & history services
 ```
 
 ---
@@ -242,40 +257,51 @@ D:\Youtube Chatbot\
 * **`generate_mindmap(...)`**: Generates a valid Mermaid.js concept hierarchy flowchart mapping the video's core thesis, pillars, and actionable mechanisms.
 * **`generate_study_notes_markdown(...)`**: Compiles an executive brief, flashcards, quiz solutions, and audience consensus into an exportable `.md` file.
 
-### 7. `src/voice_player_service.py` — Voice & In-Sync Interactive Video Player
+### 7. `src/repurpose_service.py` — AI Content Repurposing Suite
+* **`generate_viral_clips(...)`**: Detects 3-5 high-engagement moments in the transcript, calculating virality scores, psychological hooks, punchline quotes, and copy-ready captions.
+* **`generate_social_thread(...)`**: Converts dense transcripts into 7-9 tweet threads or formatted LinkedIn thought leadership posts with hooks and hashtags.
+* **`generate_seo_blog(...)`**: Synthesizes a 1,500-word SEO article with Google meta description, headings, timestamp references, and FAQ schema.
+
+### 8. `src/history_service.py` — Persistent Analysis History Engine
+* **`load_history()`**: Loads past video analysis sessions from `storage/history.json` and automatically backfills cached transcripts on first start.
+* **`add_to_history(...)`**: Records newly analyzed videos with titles, authors, and thumbnails.
+* **`delete_history_item(...)` & `clear_all_history()`**: Allows users to manage and purge their history.
+
+### 9. `src/voice_player_service.py` — Voice & In-Sync Interactive Video Player
 * **`render_sync_player_html(...)`**: Embeds a 16:9 responsive YouTube player with playhead seeking capabilities.
 * **`render_voice_input_html(...)`**: Native Web Speech API dictation widget with mic animation and one-click copy to chat.
 * **`render_tts_player_html(...)`**: Inline speech synthesis button (`🔊 Listen to Answer`) that speaks AI responses aloud using browser speech synthesis.
 * **`strip_markdown_for_speech(...)`**: Cleans markdown brackets, symbols, and URLs to ensure natural audio pronunciation.
 
-### 8. `src/text_processor.py` — Timestamp-Aware Chunking
+### 10. `src/text_processor.py` — Timestamp-Aware Chunking
 * Implements `TimestampAwareChunker`. Instead of destroying metadata by flattening text, it aggregates chronological snippets into ~1600 character chunks while tracking:
   * `start_seconds` & `end_seconds`
   * Formatted strings (`[MM:SS]`)
   * Direct deep-link URLs (`https://youtu.be/{video_id}?t={start_seconds}`)
 * Embeds time markers directly into the text header so the LLM explicitly cites video moments.
 
-### 9. `src/vectorstore.py` — FAISS Vector Store & Safe Batching
+### 11. `src/vectorstore.py` — FAISS Vector Store & Safe Batching
 * Builds and queries high-speed FAISS vector indexes.
 * **Safe Rate-Limit Batching**: Embeds chunks in batches of 50 with automatic backoff and retry (`RESOURCE_EXHAUSTED` / `429` detection) to avoid Google Gemini free-tier rate limits.
 * Checks disk cache before embedding: previously indexed videos load in **0.05 seconds**.
 
-### 10. `src/rag_engine.py` — Conversational Engine with Resilience
+### 12. `src/rag_engine.py` — Conversational Engine with Resilience
 * **Multi-Model Fallback**: Uses `invoke_with_resilience` to cascade across `gemini-3.8-flash`, `gemini-3.5-flash`, and `gemini-3-flash-preview` if high traffic (`503`) or quota limits (`429`) occur.
 * **Dual-Context Grounding**: System prompt provides both the **video transcript** and **audience comments data**, allowing users to ask questions about both the video content and audience reactions.
 * **Conversational Memory**: Rephrases follow-up questions in light of chat history.
 * **Executive Summaries**: Produces comprehensive digests with core breakthroughs and action items.
 
-### 11. `app.py` — SaaS Web Application
+### 13. `app.py` — SaaS Web Application
 * Built with Streamlit and styled with responsive CSS.
 * Clean top header with hidden default Streamlit menus and footers.
-* Prominent, collapsible sidebar with an expand button (`>>`) for toggling navigation.
-* 5 dedicated tabs:
+* Prominent, collapsible sidebar with an expand button (`>>`) and persistent **Recent History Drawer**.
+* 6 dedicated tabs:
   1. **💬 Video & Audience Q&A** (Voice dictation, audio playback, in-sync seek)
   2. **🗣️ Audience & Comments Hub** (Sentiment, consensus, debates, top doubts)
   3. **🎓 Study & Learning Hub** (Comprehension quiz, flashcards, mind map, study notes export)
-  4. **📋 Executive Summary** (Comprehensive executive digest with 1-click regeneration)
-  5. **📜 Searchable Transcript** (Real-time keyword search across dialogue cues)
+  4. **⚡ Content Repurposer** (Viral Shorts moments, X/LinkedIn threads, 1,500-word SEO blog post)
+  5. **📋 Executive Summary** (Comprehensive executive digest with 1-click regeneration)
+  6. **📜 Searchable Transcript** (Real-time keyword search across dialogue cues)
 
 ---
 
@@ -357,6 +383,9 @@ python tests/test_pipeline.py
 
 # Run voice, interactive player, and study hub unit tests
 python tests/test_study_and_player.py
+
+# Run viral repurposing and analysis history tests
+python tests/test_repurpose_and_history.py
 ```
 
 ---

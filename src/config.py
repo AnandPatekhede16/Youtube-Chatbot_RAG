@@ -11,6 +11,8 @@ COMMENTS_DIR = STORAGE_DIR / "comments"
 COMMENTS_ANALYSIS_DIR = STORAGE_DIR / "comments_analysis"
 STUDY_DIR = STORAGE_DIR / "study"
 TEMP_AUDIO_DIR = STORAGE_DIR / "temp_audio"
+REPURPOSE_DIR = STORAGE_DIR / "repurpose"
+HISTORY_FILE = STORAGE_DIR / "history.json"
 
 # Ensure storage directories exist
 VECTORS_DIR.mkdir(parents=True, exist_ok=True)
@@ -19,6 +21,7 @@ COMMENTS_DIR.mkdir(parents=True, exist_ok=True)
 COMMENTS_ANALYSIS_DIR.mkdir(parents=True, exist_ok=True)
 STUDY_DIR.mkdir(parents=True, exist_ok=True)
 TEMP_AUDIO_DIR.mkdir(parents=True, exist_ok=True)
+REPURPOSE_DIR.mkdir(parents=True, exist_ok=True)
 
 # Load .env file
 ENV_PATH = PROJECT_ROOT / ".env"
