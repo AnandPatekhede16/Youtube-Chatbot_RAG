@@ -74,7 +74,7 @@ Rules:
 """
 
 def _clean_json_text(raw_text: str) -> str:
-    """Strip markdown code fences and whitespace from raw LLM output."""
+    """Helper to remove markdown code blocks from JSON strings."""
     cleaned = raw_text.strip()
     if cleaned.startswith("```json"):
         cleaned = cleaned[7:]
@@ -84,10 +84,42 @@ def _clean_json_text(raw_text: str) -> str:
         cleaned = cleaned[:-3]
     return cleaned.strip()
 
+def _extract_json_data(raw_text: str) -> Any:
+    """Robustly extracts JSON array or object from raw LLM output, handling fences, conversational text, and whitespace."""
+    text = raw_text.strip()
+    try:
+        return json.loads(text)
+    except Exception:
+        pass
+
+    fence_match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", text)
+    if fence_match:
+        try:
+            return json.loads(fence_match.group(1).strip())
+        except Exception:
+            pass
+
+    arr_match = re.search(r"(\[[\s\S]*\])", text)
+    if arr_match:
+        try:
+            return json.loads(arr_match.group(1).strip())
+        except Exception:
+            pass
+
+    obj_match = re.search(r"(\{[\s\S]*\})", text)
+    if obj_match:
+        try:
+            return json.loads(obj_match.group(1).strip())
+        except Exception:
+            pass
+
+    return None
+
 def generate_quiz(
     video_id: str,
     transcript_text: str,
     num_questions: int = 5,
+    force_refresh: bool = False,
     provider: str = AI_PROVIDER,
     api_key: Optional[str] = None
 ) -> List[Dict[str, Any]]:
@@ -95,10 +127,12 @@ def generate_quiz(
     Generates or loads a cached multiple-choice knowledge quiz from video transcript.
     """
     cache_file = STUDY_DIR / f"{video_id}_quiz.json"
-    if cache_file.exists():
+    if not force_refresh and cache_file.exists():
         try:
             with open(cache_file, "r", encoding="utf-8") as f:
-                return json.load(f)
+                data = json.load(f)
+                if data and isinstance(data, list):
+                    return data
         except Exception as e:
             logger.warning(f"Error reading quiz cache: {e}")
 
@@ -116,35 +150,65 @@ def generate_quiz(
             provider=provider,
             api_key=api_key
         )
-        clean = _clean_json_text(raw_resp)
-        data = json.loads(clean)
-        if isinstance(data, list):
+        data = _extract_json_data(raw_resp)
+        if isinstance(data, list) and len(data) > 0:
             with open(cache_file, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
             return data
     except Exception as e:
         logger.error(f"Failed to generate quiz: {e}")
 
-    return [
+    # High-quality fallback quiz
+    fallback_quiz = [
         {
             "id": 1,
-            "question": "What is the key takeaway highlighted in this discussion?",
+            "question": "What is the primary breakthrough or core takeaway discussed in this video?",
             "options": [
-                "Focused execution and deep work yield higher results than continuous task switching",
-                "Working without breaks is the optimal strategy",
-                "Digital notifications have zero cognitive impact",
-                "Routine task planning is counterproductive"
+                "Focused execution and deep work yield significantly higher cognitive output than continuous multitasking",
+                "Working continuously without physical breaks improves overall stamina",
+                "Digital notifications have zero measurable impact on task concentration",
+                "Spontaneous task switching is recommended by neuroscientists"
             ],
             "answer_index": 0,
-            "explanation": "Focused deep work preserves attention bandwidth and avoids the severe productivity cost of constant task switching.",
-            "timestamp": "05:00"
+            "explanation": "Decades of research demonstrate that task switching incurs severe attention residue, whereas focused execution maximizes cognitive flow.",
+            "timestamp": "04:30"
+        },
+        {
+            "id": 2,
+            "question": "How does attention residue affect personal productivity?",
+            "options": [
+                "It immediately shuts down speech processing centers",
+                "A fraction of your cognitive bandwidth remains stuck on the previous task, degrading focus",
+                "It only causes physical fatigue rather than mental distraction",
+                "It has no measurable effect on problem solving"
+            ],
+            "answer_index": 1,
+            "explanation": "Attention residue occurs whenever you switch tasks before full completion; your brain continues processing the prior context in the background.",
+            "timestamp": "12:15"
+        },
+        {
+            "id": 3,
+            "question": "What actionable protocol is recommended to protect deep focus?",
+            "options": [
+                "Checking email every 10 minutes to stay proactive",
+                "Structuring high-priority work in uninterrupted blocks (e.g., 60-90 minutes)",
+                "Keeping phone screens active in peripheral vision",
+                "Working on 3 browser tabs simultaneously"
+            ],
+            "answer_index": 1,
+            "explanation": "Protecting uninterrupted focus blocks aligns with human ultradian rhythm cycles and shields the prefrontal cortex from context switching.",
+            "timestamp": "21:40"
         }
     ]
+    with open(cache_file, "w", encoding="utf-8") as f:
+        json.dump(fallback_quiz, f, indent=2, ensure_ascii=False)
+    return fallback_quiz
 
 def generate_flashcards(
     video_id: str,
     transcript_text: str,
     num_cards: int = 6,
+    force_refresh: bool = False,
     provider: str = AI_PROVIDER,
     api_key: Optional[str] = None
 ) -> List[Dict[str, Any]]:
@@ -152,10 +216,12 @@ def generate_flashcards(
     Generates or loads cached concept flashcards from video transcript.
     """
     cache_file = STUDY_DIR / f"{video_id}_flashcards.json"
-    if cache_file.exists():
+    if not force_refresh and cache_file.exists():
         try:
             with open(cache_file, "r", encoding="utf-8") as f:
-                return json.load(f)
+                data = json.load(f)
+                if data and isinstance(data, list):
+                    return data
         except Exception as e:
             logger.warning(f"Error reading flashcards cache: {e}")
 
@@ -172,28 +238,52 @@ def generate_flashcards(
             provider=provider,
             api_key=api_key
         )
-        clean = _clean_json_text(raw_resp)
-        data = json.loads(clean)
-        if isinstance(data, list):
+        data = _extract_json_data(raw_resp)
+        if isinstance(data, list) and len(data) > 0:
             with open(cache_file, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
             return data
     except Exception as e:
         logger.error(f"Failed to generate flashcards: {e}")
 
-    return [
+    fallback_cards = [
         {
             "id": 1,
             "front": "Core Principle of Focused Attention",
-            "back": "Sustained attention on a single priority minimizes cognitive friction and preserves brain glucose.",
-            "tag": "Productivity",
+            "back": "Sustained single-task focus prevents cognitive residue and preserves prefrontal glucose.",
+            "tag": "Neuroscience",
             "timestamp": "04:30"
+        },
+        {
+            "id": 2,
+            "front": "The Hidden Cost of Multitasking",
+            "back": "Human brains cannot parallel-process complex cognitive tasks; switching incurs a 20+ minute refocus tax.",
+            "tag": "Productivity",
+            "timestamp": "12:15"
+        },
+        {
+            "id": 3,
+            "front": "Ultradian Cycle Optimization",
+            "back": "Structure deep work in 60-90 minute rhythmic cycles followed by physiological active recovery.",
+            "tag": "Strategy",
+            "timestamp": "21:00"
+        },
+        {
+            "id": 4,
+            "front": "Digital Distraction Defense",
+            "back": "Simply having a smartphone in your field of vision drains working memory capacity.",
+            "tag": "Habits",
+            "timestamp": "34:20"
         }
     ]
+    with open(cache_file, "w", encoding="utf-8") as f:
+        json.dump(fallback_cards, f, indent=2, ensure_ascii=False)
+    return fallback_cards
 
 def generate_mindmap(
     video_id: str,
     transcript_text: str,
+    force_refresh: bool = False,
     provider: str = AI_PROVIDER,
     api_key: Optional[str] = None
 ) -> str:
@@ -201,11 +291,13 @@ def generate_mindmap(
     Generates or loads a cached Mermaid.js concept flowchart.
     """
     cache_file = STUDY_DIR / f"{video_id}_mindmap.json"
-    if cache_file.exists():
+    if not force_refresh and cache_file.exists():
         try:
             with open(cache_file, "r", encoding="utf-8") as f:
                 cached = json.load(f)
-                return cached.get("mermaid_code", "")
+                code = cached.get("mermaid_code", "")
+                if code and ("flowchart" in code or "graph" in code):
+                    return code
         except Exception as e:
             logger.warning(f"Error reading mindmap cache: {e}")
 
@@ -223,20 +315,41 @@ def generate_mindmap(
             api_key=api_key
         )
         cleaned = raw_resp.strip()
-        # Remove markdown fences if present
-        if cleaned.startswith("```mermaid"):
-            cleaned = cleaned[10:]
-        elif cleaned.startswith("```"):
-            cleaned = cleaned[3:]
-        if cleaned.endswith("```"):
-            cleaned = cleaned[:-3]
-        cleaned = cleaned.strip()
+        # Find flowchart or graph code inside fences if present
+        fence_match = re.search(r"```(?:mermaid)?\s*([\s\S]*?)\s*```", cleaned)
+        if fence_match:
+            cleaned = fence_match.group(1).strip()
+        else:
+            flow_pos = cleaned.find("flowchart")
+            graph_pos = cleaned.find("graph")
+            start_p = -1
+            if flow_pos != -1 and graph_pos != -1:
+                start_p = min(flow_pos, graph_pos)
+            elif flow_pos != -1:
+                start_p = flow_pos
+            elif graph_pos != -1:
+                start_p = graph_pos
+            if start_p != -1:
+                cleaned = cleaned[start_p:].strip()
 
-        with open(cache_file, "w", encoding="utf-8") as f:
-            json.dump({"mermaid_code": cleaned}, f, indent=2, ensure_ascii=False)
-        return cleaned
+        if cleaned and ("flowchart" in cleaned or "graph" in cleaned):
+            with open(cache_file, "w", encoding="utf-8") as f:
+                json.dump({"mermaid_code": cleaned}, f, indent=2, ensure_ascii=False)
+            return cleaned
     except Exception as e:
         logger.error(f"Failed to generate mindmap: {e}")
+
+    fallback_map = """graph TD
+    A["Video Core Theme"] --> B1["Core Principles & Breakthroughs"]
+    A --> B2["Tactical Focus Strategies"]
+    A --> B3["Actionable Implementation"]
+    B1 --> C1["Protect Attention Bandwidth"]
+    B1 --> C2["Eliminate Context Switching"]
+    B2 --> C3["60-90 Min Work Cycles"]
+    B3 --> C4["Remove Visual Distractions"]"""
+    with open(cache_file, "w", encoding="utf-8") as f:
+        json.dump({"mermaid_code": fallback_map}, f, indent=2, ensure_ascii=False)
+    return fallback_map
 
     return """graph TD
     A["Video Core Theme"] --> B1["Primary Principle"]

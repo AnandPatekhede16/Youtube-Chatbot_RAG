@@ -238,6 +238,62 @@ st.markdown("""
         background: rgba(255, 30, 86, 0.3);
         color: #ffffff;
     }
+
+    /* Modern Persistent Navbar Radio Tabs */
+    .st-key-active_nav_tab div[role="radiogroup"],
+    .st-key-active_study_subtab div[role="radiogroup"],
+    .st-key-active_rep_subtab div[role="radiogroup"] {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        background: rgba(125, 125, 125, 0.08);
+        padding: 6px;
+        border-radius: 12px;
+        border: 1px solid rgba(125, 125, 125, 0.16);
+        margin-bottom: 20px;
+    }
+    .st-key-active_nav_tab div[role="radiogroup"] > label,
+    .st-key-active_study_subtab div[role="radiogroup"] > label,
+    .st-key-active_rep_subtab div[role="radiogroup"] > label {
+        background: rgba(255, 255, 255, 0.03);
+        padding: 8px 18px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 0.92rem;
+        transition: all 0.2s ease;
+        margin: 0 !important;
+        border: 1px solid rgba(125, 125, 125, 0.12);
+        display: flex;
+        align-items: center;
+    }
+    /* Hide the radio circular input button inside our navbars */
+    .st-key-active_nav_tab div[role="radiogroup"] > label > div:first-child,
+    .st-key-active_study_subtab div[role="radiogroup"] > label > div:first-child,
+    .st-key-active_rep_subtab div[role="radiogroup"] > label > div:first-child {
+        display: none !important;
+    }
+    .st-key-active_nav_tab div[role="radiogroup"] > label:hover,
+    .st-key-active_study_subtab div[role="radiogroup"] > label:hover,
+    .st-key-active_rep_subtab div[role="radiogroup"] > label:hover {
+        background: rgba(255, 30, 86, 0.12);
+        border-color: rgba(255, 30, 86, 0.3);
+        color: #ff1e56;
+    }
+    .st-key-active_nav_tab div[role="radiogroup"] > label[data-checked="true"],
+    .st-key-active_study_subtab div[role="radiogroup"] > label[data-checked="true"],
+    .st-key-active_rep_subtab div[role="radiogroup"] > label[data-checked="true"] {
+        background: #ff1e56 !important;
+        color: #ffffff !important;
+        border-color: #ff1e56 !important;
+        box-shadow: 0 4px 12px rgba(255, 30, 86, 0.35);
+    }
+    .st-key-active_nav_tab div[role="radiogroup"] > label[data-checked="true"] p,
+    .st-key-active_study_subtab div[role="radiogroup"] > label[data-checked="true"] p,
+    .st-key-active_rep_subtab div[role="radiogroup"] > label[data-checked="true"] p {
+        color: #ffffff !important;
+        font-weight: 700 !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -284,6 +340,12 @@ if "url_input_value" not in st.session_state:
     st.session_state.url_input_value = "https://www.youtube.com/watch?v=4Vz6L8B73i4"
 if "auto_load_vid" not in st.session_state:
     st.session_state.auto_load_vid = None
+if "active_nav_tab" not in st.session_state:
+    st.session_state.active_nav_tab = "💬 Video & Audience Q&A"
+if "active_study_subtab" not in st.session_state:
+    st.session_state.active_study_subtab = "🎯 Knowledge Quiz"
+if "active_rep_subtab" not in st.session_state:
+    st.session_state.active_rep_subtab = "🎬 Viral Shorts & Reels Hooks"
 
 # 4. Sidebar: Clean, Sleek SaaS Layout
 with st.sidebar:
@@ -445,6 +507,9 @@ with st.sidebar:
                     st.session_state.viral_clips = None
                     st.session_state.social_threads = {}
                     st.session_state.seo_blog = None
+                    st.session_state.active_nav_tab = "💬 Video & Audience Q&A"
+                    st.session_state.active_study_subtab = "🎯 Knowledge Quiz"
+                    st.session_state.active_rep_subtab = "🎬 Viral Shorts & Reels Hooks"
 
                     # Add to persistent history
                     add_to_history(vid, meta)
@@ -505,19 +570,29 @@ else:
         st.info(f"ℹ️ **Note:** Speech subtitles were disabled by the creator for this video. TubeMind AI automatically recovered **{ch_count} Video Chapters & Timestamps** plus **Audience Comments** so complete Q&A, chapter navigation, and social listening work seamlessly!")
 
     # 7. Main Feature Tabs
-    tab_chat, tab_comments, tab_study, tab_repurpose, tab_summary, tab_transcript = st.tabs([
+    main_nav_tabs = [
         "💬 Video & Audience Q&A", 
         "🗣️ Audience & Comments Hub", 
         "🎓 Study & Learning Hub",
         "⚡ Content Repurposer",
         "📋 Executive Summary", 
         "📜 Searchable Transcript"
-    ])
+    ]
+    if "active_nav_tab" not in st.session_state or st.session_state.active_nav_tab not in main_nav_tabs:
+        st.session_state.active_nav_tab = main_nav_tabs[0]
+
+    current_main_tab = st.radio(
+        "Navigation",
+        options=main_nav_tabs,
+        key="active_nav_tab",
+        horizontal=True,
+        label_visibility="collapsed"
+    )
 
     # ==========================================
     # TAB 1: INTERACTIVE CHAT & IN-SYNC PLAYER
     # ==========================================
-    with tab_chat:
+    if current_main_tab == "💬 Video & Audience Q&A":
         col_player, col_chat = st.columns([5, 6], gap="large")
 
         # ------------------------------------------
@@ -573,19 +648,19 @@ else:
         # RIGHT: CHAT, VOICE & CITATIONS
         # ------------------------------------------
         with col_chat:
-            # Suggested Questions
+            # Suggested Questions (Universal for any video)
             st.markdown("**💡 Quick Test Prompts:**")
             col_q1, col_q2, col_q3 = st.columns(3)
             sample_q = None
             with col_q1:
-                if st.button("🧠 Multitasking?", use_container_width=True):
-                    sample_q = "What does she say about multitasking versus task switching?"
+                if st.button("🎯 Core Insights?", use_container_width=True, key="btn_sample_core"):
+                    sample_q = "What are the core insights, key takeaways, and main arguments discussed in this video?"
             with col_q2:
-                if st.button("📱 Phone on Table?", use_container_width=True):
-                    sample_q = "Why does having a phone visible on the table decrease IQ and focus?"
+                if st.button("💡 Actionable Tactics?", use_container_width=True, key="btn_sample_tactics"):
+                    sample_q = "What practical advice, steps, or actionable recommendations does the speaker share in this video?"
             with col_q3:
-                if st.button("🗣️ Viewer Reactions?", use_container_width=True):
-                    sample_q = "What are viewers in the comments saying about this discussion?"
+                if st.button("🗣️ Viewer Consensus?", use_container_width=True, key="btn_sample_reactions"):
+                    sample_q = "What are the viewers discussing in the comments, and what is the community reaction or consensus?"
 
             # Voice Dictation Widget
             components.html(render_voice_input_html(), height=80)
@@ -683,7 +758,7 @@ else:
     # ==========================================
     # TAB 2: AUDIENCE & COMMENTS HUB
     # ==========================================
-    with tab_comments:
+    elif current_main_tab == "🗣️ Audience & Comments Hub":
         st.subheader("🗣️ Audience Reaction & Social Listening Intelligence")
 
         if not st.session_state.comments_analysis:
@@ -796,21 +871,65 @@ else:
     # ==========================================
     # TAB 3: STUDY & LEARNING HUB
     # ==========================================
-    with tab_study:
+    elif current_main_tab == "🎓 Study & Learning Hub":
         st.subheader("🎓 Study & Concept Learning Hub")
         st.caption("Master long-form videos with AI-generated comprehension quizzes, concept flashcards, visual knowledge graphs, and printable study briefs.")
 
-        sub_quiz, sub_cards, sub_mindmap, sub_export = st.tabs([
+        # Auto-load cached study assets if available on disk
+        if st.session_state.quiz_data is None:
+            q_file = STUDY_DIR / f"{st.session_state.video_id}_quiz.json"
+            if q_file.exists():
+                try:
+                    with open(q_file, "r", encoding="utf-8") as f:
+                        q_data = json.load(f)
+                        if q_data and isinstance(q_data, list):
+                            st.session_state.quiz_data = q_data
+                except Exception:
+                    pass
+
+        if st.session_state.flashcards_data is None:
+            fc_file = STUDY_DIR / f"{st.session_state.video_id}_flashcards.json"
+            if fc_file.exists():
+                try:
+                    with open(fc_file, "r", encoding="utf-8") as f:
+                        fc_data = json.load(f)
+                        if fc_data and isinstance(fc_data, list):
+                            st.session_state.flashcards_data = fc_data
+                except Exception:
+                    pass
+
+        if not st.session_state.mindmap_data:
+            mm_file = STUDY_DIR / f"{st.session_state.video_id}_mindmap.json"
+            if mm_file.exists():
+                try:
+                    with open(mm_file, "r", encoding="utf-8") as f:
+                        mm_data = json.load(f)
+                        if mm_data and isinstance(mm_data, dict):
+                            st.session_state.mindmap_data = mm_data.get("mermaid_code", "")
+                except Exception:
+                    pass
+
+        study_subtabs = [
             "🎯 Knowledge Quiz", 
             "🃏 Concept Flashcards", 
             "🗺️ Visual Mind Map", 
             "📥 1-Click Study Notes Export"
-        ])
+        ]
+        if "active_study_subtab" not in st.session_state or st.session_state.active_study_subtab not in study_subtabs:
+            st.session_state.active_study_subtab = study_subtabs[0]
+
+        current_study_subtab = st.radio(
+            "Study Sub-navigation",
+            options=study_subtabs,
+            key="active_study_subtab",
+            horizontal=True,
+            label_visibility="collapsed"
+        )
 
         # ------------------------------------------
         # Sub-tab 1: Interactive Knowledge Quiz
         # ------------------------------------------
-        with sub_quiz:
+        if current_study_subtab == "🎯 Knowledge Quiz":
             st.markdown("#### 🎯 Interactive Comprehension Quiz")
             st.caption("Test your retention and understanding of the key concepts discussed in this video.")
 
@@ -823,6 +942,7 @@ else:
                                 st.session_state.video_id,
                                 st.session_state.full_transcript,
                                 num_questions=5,
+                                force_refresh=False,
                                 provider=provider_choice,
                                 api_key=active_key
                             )
@@ -837,6 +957,7 @@ else:
                                 st.session_state.video_id,
                                 st.session_state.full_transcript,
                                 num_questions=5,
+                                force_refresh=True,
                                 provider=provider_choice,
                                 api_key=active_key
                             )
@@ -851,19 +972,21 @@ else:
                         ts_ref = q.get("timestamp", "N/A")
                         st.markdown(f"**Q{qid}. {q['question']}** *(⏱️ Reference: {ts_ref})*")
                         
-                        ans = st.radio(
+                        st.radio(
                             "Choose your answer:",
                             options=q["options"],
                             key=f"quiz_radio_{qid}",
                             index=None
                         )
-                        st.session_state.quiz_user_answers[qid] = ans
                         st.markdown("<hr style='margin: 8px 0; opacity: 0.15;'>", unsafe_allow_html=True)
 
                     submit_quiz = st.form_submit_button("✅ Submit Answers & View Results", type="primary")
 
                 if submit_quiz:
                     st.session_state.quiz_submitted = True
+                    for q in st.session_state.quiz_data:
+                        qid = q["id"]
+                        st.session_state.quiz_user_answers[qid] = st.session_state.get(f"quiz_radio_{qid}")
 
                 if st.session_state.quiz_submitted:
                     total = len(st.session_state.quiz_data)
@@ -875,7 +998,13 @@ else:
                     for q in st.session_state.quiz_data:
                         qid = q["id"]
                         user_ans = st.session_state.quiz_user_answers.get(qid)
-                        correct_opt = q["options"][q["answer_index"]]
+                        try:
+                            ans_idx = int(q.get("answer_index", 0))
+                            if ans_idx < 0 or ans_idx >= len(q["options"]):
+                                ans_idx = 0
+                        except Exception:
+                            ans_idx = 0
+                        correct_opt = q["options"][ans_idx]
                         is_correct = (user_ans == correct_opt)
 
                         if is_correct:
@@ -884,7 +1013,7 @@ else:
                         else:
                             st.error(f"**Q{qid}: Incorrect** ❌\n\nYour answer: *{user_ans or 'Not answered'}*\n\n**Correct Answer:** *{correct_opt}*\n\n💡 **Explanation:** {q.get('explanation')}")
 
-                    score_pct = int((correct_count / total) * 100)
+                    score_pct = int((correct_count / total) * 100) if total > 0 else 0
                     st.markdown(f"""
                     <div class='metric-card' style='text-align:center; margin-top:16px;'>
                         <div class='metric-label'>Overall Score</div>
@@ -893,10 +1022,15 @@ else:
                     </div>
                     """, unsafe_allow_html=True)
 
+                    if st.button("🔄 Retake Quiz", key="btn_retake_quiz"):
+                        st.session_state.quiz_submitted = False
+                        st.session_state.quiz_user_answers = {}
+                        st.rerun()
+
         # ------------------------------------------
         # Sub-tab 2: High-Yield Flashcards
         # ------------------------------------------
-        with sub_cards:
+        elif current_study_subtab == "🃏 Concept Flashcards":
             st.markdown("#### 🃏 Concept Flashcards")
             st.caption("Active recall cards capturing high-impact breakthroughs, mental models, and principles.")
 
@@ -907,21 +1041,27 @@ else:
                             st.session_state.video_id,
                             st.session_state.full_transcript,
                             num_cards=6,
+                            force_refresh=False,
                             provider=provider_choice,
                             api_key=active_key
                         )
                         st.rerun()
             else:
-                if st.button("🔄 Refresh Flashcards", key="btn_refresh_cards"):
-                    with st.spinner("Synthesizing concept flashcards..."):
-                        st.session_state.flashcards_data = generate_flashcards(
-                            st.session_state.video_id,
-                            st.session_state.full_transcript,
-                            num_cards=6,
-                            provider=provider_choice,
-                            api_key=active_key
-                        )
-                        st.rerun()
+                col_c1, col_c2 = st.columns([4, 1])
+                with col_c1:
+                    st.success(f"✨ {len(st.session_state.flashcards_data)} Concept Flashcards Ready!")
+                with col_c2:
+                    if st.button("🔄 Refresh Flashcards", key="btn_refresh_cards"):
+                        with st.spinner("Synthesizing concept flashcards..."):
+                            st.session_state.flashcards_data = generate_flashcards(
+                                st.session_state.video_id,
+                                st.session_state.full_transcript,
+                                num_cards=6,
+                                force_refresh=True,
+                                provider=provider_choice,
+                                api_key=active_key
+                            )
+                            st.rerun()
 
                 card_cols = st.columns(2)
                 for idx, card in enumerate(st.session_state.flashcards_data):
@@ -932,54 +1072,59 @@ else:
                         front = card.get("front", "")
                         back = card.get("back", "")
 
-                        with st.container():
-                            st.markdown(f"""
-                            <div class='metric-card' style='min-height: 180px; margin-bottom: 14px;'>
-                                <div style='display:flex; justify-content:space-between; align-items:center;'>
-                                    <span class='badge-pill badge-purple'>🏷️ {tag}</span>
-                                    <span style='font-size:0.80rem; opacity:0.7;'>⏱️ {ts}</span>
-                                </div>
-                                <h4 style='margin: 8px 0 10px 0; font-size: 1.05rem;'>{front}</h4>
-                                <div style='background:rgba(125,125,125,0.08); padding:10px 12px; border-radius:8px; border-left:3px solid #ff1e56;'>
-                                    <strong>💡 Key Insight:</strong> {back}
-                                </div>
+                        st.markdown(f"""
+                        <div class='metric-card' style='min-height: 180px; margin-bottom: 14px;'>
+                            <div style='display:flex; justify-content:space-between; align-items:center;'>
+                                <span class='badge-pill badge-purple'>🏷️ {tag}</span>
+                                <span style='font-size:0.80rem; opacity:0.7;'>⏱️ {ts}</span>
                             </div>
-                            """, unsafe_allow_html=True)
+                            <h4 style='margin: 8px 0 10px 0; font-size: 1.05rem;'>{front}</h4>
+                            <div style='background:rgba(125,125,125,0.08); padding:10px 12px; border-radius:8px; border-left:3px solid #ff1e56;'>
+                                <strong>💡 Key Insight:</strong> {back}
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
 
         # ------------------------------------------
         # Sub-tab 3: Visual Concept Mind Map
         # ------------------------------------------
-        with sub_mindmap:
+        elif current_study_subtab == "🗺️ Visual Mind Map":
             st.markdown("#### 🗺️ Visual Concept Tree & Mind Map")
             st.caption("A structural graph of the video's core thesis, pillars, and actionable mechanisms.")
 
-            if st.session_state.mindmap_data is None:
+            if not st.session_state.mindmap_data:
                 if st.button("⚡ Generate Visual Concept Map", type="primary", key="btn_gen_map"):
                     with st.spinner("Constructing visual concept tree with Mermaid..."):
                         st.session_state.mindmap_data = generate_mindmap(
                             st.session_state.video_id,
                             st.session_state.full_transcript,
+                            force_refresh=False,
                             provider=provider_choice,
                             api_key=active_key
                         )
                         st.rerun()
             else:
-                if st.button("🔄 Regenerate Mind Map", key="btn_regen_map"):
-                    with st.spinner("Re-analyzing conceptual hierarchy..."):
-                        st.session_state.mindmap_data = generate_mindmap(
-                            st.session_state.video_id,
-                            st.session_state.full_transcript,
-                            provider=provider_choice,
-                            api_key=active_key
-                        )
-                        st.rerun()
+                col_m1, col_m2 = st.columns([4, 1])
+                with col_m1:
+                    st.success("✨ Visual Concept Flowchart Ready!")
+                with col_m2:
+                    if st.button("🔄 Regenerate Mind Map", key="btn_regen_map"):
+                        with st.spinner("Re-analyzing conceptual hierarchy..."):
+                            st.session_state.mindmap_data = generate_mindmap(
+                                st.session_state.video_id,
+                                st.session_state.full_transcript,
+                                force_refresh=True,
+                                provider=provider_choice,
+                                api_key=active_key
+                            )
+                            st.rerun()
 
                 st.markdown(f"```mermaid\n{st.session_state.mindmap_data}\n```")
 
         # ------------------------------------------
         # Sub-tab 4: One-Click Study Notes Export
         # ------------------------------------------
-        with sub_export:
+        elif current_study_subtab == "📥 1-Click Study Notes Export":
             st.markdown("#### 📥 Download Complete Study Notes & Brief")
             st.caption("Export everything—executive summary, flashcards, comprehension quiz, mind map, and audience feedback—into a clean Markdown document.")
 
@@ -1008,31 +1153,55 @@ else:
     # ==========================================
     # TAB 4: CONTENT REPURPOSER (TOPIC 2)
     # ==========================================
-    with tab_repurpose:
+    elif current_main_tab == "⚡ Content Repurposer":
         st.subheader("⚡ AI Content Repurposing Engine")
         st.caption("Repurpose high-yield video insights into viral short-form clips, Twitter/LinkedIn threads, and full SEO blog posts.")
 
-        rep_shorts, rep_threads, rep_blog = st.tabs([
+        # Auto-load cached repurpose assets if available on disk
+        if st.session_state.viral_clips is None:
+            cached_clips_file = REPURPOSE_DIR / f"{st.session_state.video_id}_viral_clips.json"
+            if cached_clips_file.exists():
+                try:
+                    with open(cached_clips_file, "r", encoding="utf-8") as f:
+                        c_data = json.load(f)
+                        if c_data and isinstance(c_data, list):
+                            st.session_state.viral_clips = c_data
+                except Exception:
+                    pass
+
+        if st.session_state.seo_blog is None:
+            blog_cache = REPURPOSE_DIR / f"{st.session_state.video_id}_seo_blog.md"
+            if blog_cache.exists():
+                try:
+                    with open(blog_cache, "r", encoding="utf-8") as f:
+                        b_text = f.read()
+                        if b_text and len(b_text.strip()) > 50:
+                            st.session_state.seo_blog = b_text
+                except Exception:
+                    pass
+
+        rep_subtabs = [
             "🎬 Viral Shorts & Reels Hooks",
             "🧵 Viral Social Threads (X / LinkedIn)",
             "📝 1,500-Word SEO Blog Post"
-        ])
+        ]
+        if "active_rep_subtab" not in st.session_state or st.session_state.active_rep_subtab not in rep_subtabs:
+            st.session_state.active_rep_subtab = rep_subtabs[0]
+
+        current_rep_subtab = st.radio(
+            "Repurpose Sub-navigation",
+            options=rep_subtabs,
+            key="active_rep_subtab",
+            horizontal=True,
+            label_visibility="collapsed"
+        )
 
         # ------------------------------------------
         # Sub-tab 1: Viral Shorts & Reels Hooks
         # ------------------------------------------
-        with rep_shorts:
+        if current_rep_subtab == "🎬 Viral Shorts & Reels Hooks":
             st.markdown("#### 🎬 High-Retention Shorts & Reels Moments")
             st.caption("AI-detected emotional peaks, pattern interrupts, and contrarian insights with second-level timestamps.")
-
-            if st.session_state.viral_clips is None:
-                cached_clips_file = REPURPOSE_DIR / f"{st.session_state.video_id}_viral_clips.json"
-                if cached_clips_file.exists():
-                    try:
-                        with open(cached_clips_file, "r", encoding="utf-8") as f:
-                            st.session_state.viral_clips = json.load(f)
-                    except Exception:
-                        pass
 
             if st.session_state.viral_clips is None:
                 if st.button("🚀 Find Viral Moments & Hooks", type="primary", key="btn_gen_clips"):
@@ -1041,6 +1210,7 @@ else:
                             st.session_state.video_id,
                             st.session_state.full_transcript,
                             num_clips=4,
+                            force_refresh=False,
                             provider=provider_choice,
                             api_key=active_key
                         )
@@ -1056,6 +1226,7 @@ else:
                                 st.session_state.video_id,
                                 st.session_state.full_transcript,
                                 num_clips=4,
+                                force_refresh=True,
                                 provider=provider_choice,
                                 api_key=active_key
                             )
@@ -1074,45 +1245,46 @@ else:
                     why = clip.get("why_it_works", "")
                     caption = clip.get("recommended_caption", "")
 
-                    with st.container():
-                        st.markdown(f"""
-                        <div class='metric-card' style='margin-bottom: 16px; border-left: 4px solid #ff1e56;'>
-                            <div style='display:flex; justify-content:space-between; align-items:center;'>
-                                <span class='badge-pill badge-green'>🔥 Virality Score: {score}/100</span>
-                                <span class='badge-pill badge-purple'>🎯 {hook_type}</span>
-                                <span style='font-size:0.85rem; font-weight:600;'>⏱️ [{start_t} - {end_t}] ({dur}s)</span>
-                            </div>
-                            <h3 style='margin: 8px 0; font-size: 1.15rem;'>{title}</h3>
-                            <div style='background:rgba(125,125,125,0.08); padding:10px 14px; border-radius:8px; margin: 8px 0;'>
-                                <strong>💥 Core Punchline / Hook:</strong> "{punchline}"
-                            </div>
-                            <p style='color:#64748b; font-size:0.90rem; margin: 6px 0;'>
-                                <strong>🧠 Why it Hooks:</strong> {why}
-                            </p>
+                    st.markdown(f"""
+                    <div class='metric-card' style='margin-bottom: 16px; border-left: 4px solid #ff1e56;'>
+                        <div style='display:flex; justify-content:space-between; align-items:center;'>
+                            <span class='badge-pill badge-green'>🔥 Virality Score: {score}/100</span>
+                            <span class='badge-pill badge-purple'>🎯 {hook_type}</span>
+                            <span style='font-size:0.85rem; font-weight:600;'>⏱️ [{start_t} - {end_t}] ({dur}s)</span>
                         </div>
-                        """, unsafe_allow_html=True)
+                        <h3 style='margin: 8px 0; font-size: 1.15rem;'>{title}</h3>
+                        <div style='background:rgba(125,125,125,0.08); padding:10px 14px; border-radius:8px; margin: 8px 0;'>
+                            <strong>💥 Core Punchline / Hook:</strong> "{punchline}"
+                        </div>
+                        <p style='color:#64748b; font-size:0.90rem; margin: 6px 0;'>
+                            <strong>🧠 Why it Hooks:</strong> {why}
+                        </p>
+                    </div>
+                    """, unsafe_allow_html=True)
 
-                        c_btn, c_cap = st.columns([2, 5])
-                        with c_btn:
-                            if st.button(f"▶️ Seek to {start_t}", key=f"seek_clip_{c_id}_{start_s}"):
-                                st.session_state.current_seek = int(start_s)
-                                st.session_state.autoplay = True
-                                st.rerun()
-                        with c_cap:
-                            with st.expander("📋 Copy Ready-to-Post Caption", expanded=False):
-                                st.code(caption, language="markdown")
+                    c_btn, c_cap = st.columns([2, 5])
+                    with c_btn:
+                        if st.button(f"▶️ Seek to {start_t}", key=f"seek_clip_{c_id}_{start_s}"):
+                            st.session_state.active_nav_tab = "💬 Video & Audience Q&A"
+                            st.session_state.current_seek = int(start_s)
+                            st.session_state.autoplay = True
+                            st.rerun()
+                    with c_cap:
+                        with st.expander("📋 Copy Ready-to-Post Caption", expanded=False):
+                            st.code(caption, language="markdown")
 
         # ------------------------------------------
         # Sub-tab 2: Viral Social Threads
         # ------------------------------------------
-        with rep_threads:
+        elif current_rep_subtab == "🧵 Viral Social Threads (X / LinkedIn)":
             st.markdown("#### 🧵 Viral Social Threads & Thought Leadership")
             st.caption("Transform dense podcast dialogues into high-converting Twitter (X) threads or viral LinkedIn carousels.")
 
             platform_choice = st.radio(
                 "Select Target Platform:",
                 options=["Twitter (X) Thread", "LinkedIn Thought Leadership Post"],
-                horizontal=True
+                horizontal=True,
+                key="social_platform_choice"
             )
             plat_key = "twitter" if "Twitter" in platform_choice else "linkedin"
 
@@ -1133,23 +1305,29 @@ else:
                             st.session_state.video_id,
                             st.session_state.full_transcript,
                             platform=plat_key,
+                            force_refresh=False,
                             provider=provider_choice,
                             api_key=active_key
                         )
                         st.session_state.social_threads[plat_key] = t_data
                         st.rerun()
             else:
-                if st.button(f"🔄 Regenerate {platform_choice}", key=f"btn_regen_{plat_key}"):
-                    with st.spinner(f"Rewriting {platform_choice}..."):
-                        t_data = generate_social_thread(
-                            st.session_state.video_id,
-                            st.session_state.full_transcript,
-                            platform=plat_key,
-                            provider=provider_choice,
-                            api_key=active_key
-                        )
-                        st.session_state.social_threads[plat_key] = t_data
-                        st.rerun()
+                col_th1, col_th2 = st.columns([4, 1])
+                with col_th1:
+                    st.success(f"✨ {platform_choice} Ready!")
+                with col_th2:
+                    if st.button(f"🔄 Regenerate {platform_choice}", key=f"btn_regen_{plat_key}"):
+                        with st.spinner(f"Rewriting {platform_choice}..."):
+                            t_data = generate_social_thread(
+                                st.session_state.video_id,
+                                st.session_state.full_transcript,
+                                platform=plat_key,
+                                force_refresh=True,
+                                provider=provider_choice,
+                                api_key=active_key
+                            )
+                            st.session_state.social_threads[plat_key] = t_data
+                            st.rerun()
 
                 if plat_key == "twitter":
                     headline = thread_data.get("hook_headline", "Viral Thread")
@@ -1190,17 +1368,9 @@ else:
         # ------------------------------------------
         # Sub-tab 3: SEO Blog Post
         # ------------------------------------------
-        with rep_blog:
+        elif current_rep_subtab == "📝 1,500-Word SEO Blog Post":
             st.markdown("#### 📝 Full 1,500-Word SEO-Optimized Blog Post")
             st.caption("A publication-ready, deeply researched article complete with Google search meta description, subheadings, pull quotes, and FAQ schema.")
-
-            blog_cache = REPURPOSE_DIR / f"{st.session_state.video_id}_seo_blog.md"
-            if st.session_state.seo_blog is None and blog_cache.exists():
-                try:
-                    with open(blog_cache, "r", encoding="utf-8") as f:
-                        st.session_state.seo_blog = f.read()
-                except Exception:
-                    pass
 
             if st.session_state.seo_blog is None:
                 if st.button("🚀 Generate 1,500-Word SEO Blog Post", type="primary", key="btn_gen_blog"):
@@ -1209,6 +1379,7 @@ else:
                             st.session_state.video_id,
                             st.session_state.full_transcript,
                             st.session_state.video_meta or {},
+                            force_refresh=False,
                             provider=provider_choice,
                             api_key=active_key
                         )
@@ -1233,6 +1404,7 @@ else:
                                 st.session_state.video_id,
                                 st.session_state.full_transcript,
                                 st.session_state.video_meta or {},
+                                force_refresh=True,
                                 provider=provider_choice,
                                 api_key=active_key
                             )
@@ -1245,11 +1417,11 @@ else:
     # ==========================================
     # TAB 5: EXECUTIVE SUMMARY
     # ==========================================
-    with tab_summary:
+    elif current_main_tab == "📋 Executive Summary":
         st.subheader("📋 Executive Video Analysis & Summary")
         if st.session_state.summary:
             st.markdown(st.session_state.summary)
-            if st.button("🔄 Regenerate Executive Summary"):
+            if st.button("🔄 Regenerate Executive Summary", key="btn_regen_summary"):
                 with st.spinner("Synthesizing transcript with AI..."):
                     st.session_state.summary = st.session_state.rag_engine.generate_summary(
                         st.session_state.full_transcript
@@ -1257,7 +1429,7 @@ else:
                     st.rerun()
         else:
             st.write("Generate a comprehensive executive summary covering core insights, major breakthroughs, and action items.")
-            if st.button("⚡ Generate Executive Summary Now", type="primary"):
+            if st.button("⚡ Generate Executive Summary Now", type="primary", key="btn_gen_summary"):
                 with st.spinner("Synthesizing transcript with AI..."):
                     st.session_state.summary = st.session_state.rag_engine.generate_summary(
                         st.session_state.full_transcript
@@ -1265,9 +1437,9 @@ else:
                     st.rerun()
 
     # ==========================================
-    # TAB 5: FULL TRANSCRIPT
+    # TAB 6: FULL TRANSCRIPT
     # ==========================================
-    with tab_transcript:
+    elif current_main_tab == "📜 Searchable Transcript":
         st.subheader("📜 Searchable Video Transcript")
         search_query = st.text_input("🔍 Search transcript for keywords:", "", key="tscript_filter")
         
