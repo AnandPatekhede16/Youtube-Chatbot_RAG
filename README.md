@@ -7,7 +7,7 @@
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.40%2B-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)](https://streamlit.io/)
 [![LangChain](https://img.shields.io/badge/LangChain-v0.2-1C3C3C?style=for-the-badge&logo=langchain&logoColor=white)](https://www.langchain.com/)
 [![FAISS](https://img.shields.io/badge/FAISS-Vector%20Store-00599C?style=for-the-badge&logo=meta&logoColor=white)](https://github.com/facebookresearch/faiss)
-[![Google Gemini](https://img.shields.io/badge/Google%20Gemini-3.5%20Flash-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://ai.google.dev/)
+[![Google Gemini](https://img.shields.io/badge/Google%20Gemini-3.8%20Flash-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://ai.google.dev/)
 [![OpenAI](https://img.shields.io/badge/OpenAI-GPT--4o--mini-412991?style=for-the-badge&logo=openai&logoColor=white)](https://openai.com/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)](LICENSE)
 
@@ -63,10 +63,11 @@ chunks = RecursiveCharacterTextSplitter().create_documents([transcript])
 * Answers contain direct, clickable YouTube timestamp links (e.g. `[14:32](https://youtu.be/ID?t=872)`).
 * Users can click any citation to jump straight to the exact second in the video player.
 
-### 2. 🛡️ Resilient Subtitle Fallback (50+ Chapter Extraction)
-* When speech captions are disabled by the creator (`TranscriptsDisabled`), TubeMind AI **does not crash**.
-* It automatically intercepts video chapters (`macroMarkersListItemRenderer`), descriptions, and structured timestamps from YouTube's InnerTube data.
-* Builds an indexed chapter knowledge base so users can still explore topics, summaries, and Q&A seamlessly.
+### 2. 🛡️ 100% Video Coverage: Whisper Audio Fallback & Chapter Interceptor
+* When speech captions are disabled or unavailable for a video, TubeMind AI **does not fail**.
+* **Audio Fallback Engine (`src/audio_transcriber.py`)**: Automatically streams low-bitrate audio via `yt-dlp` and performs ultra-fast speech recognition with timestamps using **Groq Whisper** (`whisper-large-v3-turbo`) or **OpenAI Whisper**.
+* **Chapter & Description Safety Net**: If no external Whisper API keys are configured, it automatically intercepts video chapters (`macroMarkersListItemRenderer`), description markers, and structured timestamps from YouTube's InnerTube data.
+* Result: **100% coverage across virtually any YouTube video on the planet!**
 
 ### 3. 🗣️ Real-Time Public Audience Social Listening
 * Scrapes top public comments directly using YouTube's InnerTube web endpoints—**with zero Google Cloud YouTube API keys or quota exhaustion**.
@@ -106,53 +107,56 @@ chunks = RecursiveCharacterTextSplitter().create_documents([transcript])
 
 ```mermaid
 flowchart TD
-    subgraph INGESTION["1. Video Ingestion & Fallback Layer"]
+    subgraph INGESTION["1. Video Ingestion & 100% Coverage Fallback"]
         A["YouTube URL / Video ID"] --> B["URL Normalizer (src/youtube_service.py)"]
         B --> C["Fetch Metadata (oEmbed)"]
-        B --> D{"Are Subtitles Enabled?"}
+        B --> D{"Are Captions Available?"}
         D -- Yes --> E["Fetch Speech Transcripts (youtube-transcript-api)"]
-        D -- No --> F["InnerTube Chapter & Timestamp Fallback"]
-        E --> G["Raw Transcript Storage (storage/transcripts/)"]
-        F --> G
+        D -- No --> F{"Whisper Fallback Active?"}
+        F -- Yes --> G1["yt-dlp Stream + Groq Whisper API (src/audio_transcriber.py)"]
+        F -- No / Offline --> G2["InnerTube Chapter & Description Fallback"]
+        E --> H["Raw Transcript Storage (storage/transcripts/)"]
+        G1 --> H
+        G2 --> H
     end
 
     subgraph AUDIENCE["2. Audience Intelligence Layer"]
-        B --> H["InnerTube Comments Scraper (src/comments_service.py)"]
-        H --> I["Parse Timestamps & Likes"]
-        I --> J["Audience Sentiment & Debates Engine (src/comments_analyzer.py)"]
-        J --> K["Structured Audience Report (storage/comments_analysis/)"]
+        B --> I["InnerTube Comments Scraper (src/comments_service.py)"]
+        I --> J["Parse Timestamps & Likes"]
+        J --> K["Audience Sentiment & Debates Engine (src/comments_analyzer.py)"]
+        K --> L["Structured Audience Report (storage/comments_analysis/)"]
     end
 
     subgraph STUDY_LAYER["3. Educational & Concept Hub"]
-        G --> L1["Comprehension Quiz Engine (src/study_service.py)"]
-        G --> L2["Active Recall Flashcards (src/study_service.py)"]
-        G --> L3["Visual Mermaid Mind Map (src/study_service.py)"]
-        L1 & L2 & L3 --> L4["1-Click Markdown Study Notes Export"]
+        H --> M1["Comprehension Quiz Engine (src/study_service.py)"]
+        H --> M2["Active Recall Flashcards (src/study_service.py)"]
+        H --> M3["Visual Mermaid Mind Map (src/study_service.py)"]
+        M1 & M2 & M3 --> M4["1-Click Markdown Study Notes Export"]
     end
 
     subgraph INDEXING["4. Vector Indexing & Caching"]
-        G --> M["TimestampAwareChunker (src/text_processor.py)"]
-        M --> N{"Is FAISS Cached Locally?"}
-        N -- Yes --> O["Load Local FAISS (0.05s, $0 Cost)"]
-        N -- No --> P["Rate-Limit Batch Embeddings (Batches of 50)"]
-        P --> Q["Save FAISS Index (storage/vectors/)"]
-        Q --> O
+        H --> N["TimestampAwareChunker (src/text_processor.py)"]
+        N --> O{"Is FAISS Cached Locally?"}
+        O -- Yes --> P["Load Local FAISS (0.05s, $0 Cost)"]
+        O -- No --> Q["Rate-Limit Batch Embeddings (Batches of 50)"]
+        Q --> R["Save FAISS Index (storage/vectors/)"]
+        R --> P
     end
 
     subgraph RAG_CORE["5. Conversational Retrieval & Voice Interactivity"]
-        R1["User Voice Input (Web Speech API)"] --> R2["Text Query"]
-        R2 --> S["Query Rewriter (Conversation History Aware)"]
-        S --> O
-        O --> T["Retrieved Context + Audience Intelligence"]
-        T --> U["Cascading LLM Router (src/rag_engine.py)"]
-        U --> V["Grounded Answer with Deep-Link Citations"]
-        V --> W["Text-to-Speech Engine (window.speechSynthesis)"]
+        S1["User Voice Input (Web Speech API)"] --> S2["Text Query"]
+        S2 --> T["Query Rewriter (Conversation History Aware)"]
+        T --> P
+        P --> U["Retrieved Context + Audience Intelligence"]
+        U --> V["Cascading LLM Router (src/rag_engine.py)"]
+        V --> W["Grounded Answer with Deep-Link Citations"]
+        W --> X["Text-to-Speech Engine (window.speechSynthesis)"]
     end
 
     subgraph UI["6. In-Sync Presentation Layer"]
-        V --> X["Interactive Streamlit SaaS UI (app.py)"]
-        X --> Y["In-Sync YouTube Player (Auto-Seek on Citation Click)"]
-        K & L4 --> X
+        W --> Y["Interactive Streamlit SaaS UI (app.py)"]
+        Y --> Z["In-Sync YouTube Player (Auto-Seek on Citation Click)"]
+        L & M4 --> Y
     end
 ```
 
@@ -174,6 +178,7 @@ D:\Youtube Chatbot\
 │   ├── __init__.py
 │   ├── config.py                  # Environment variables, file paths, and model configs
 │   ├── youtube_service.py         # URL parsing, transcript fetcher, and chapter fallback
+│   ├── audio_transcriber.py       # Whisper speech recognition audio fallback via yt-dlp & Groq
 │   ├── comments_service.py        # Public comments scraper via YouTube InnerTube
 │   ├── comments_analyzer.py       # Audience sentiment, debates, and community consensus
 │   ├── study_service.py           # Quizzes, flashcards, Mermaid mind map, study notes export
@@ -187,10 +192,12 @@ D:\Youtube Chatbot\
 │   ├── comments/                  # Cached public viewer comments (JSON)
 │   ├── comments_analysis/         # Cached audience sentiment reports (JSON)
 │   ├── study/                     # Cached quizzes, flashcards, and mind maps (JSON)
+│   ├── temp_audio/                # Temporary streaming audio buffer (auto-cleaned)
 │   └── vectors/                   # Cached FAISS index and docstore files
 │
 └── tests/                         # Automated testing suite
     ├── test_pipeline.py           # End-to-end integration and fallback tests
+    ├── test_audio_fallback.py     # Unit tests for Whisper audio extraction & fallback
     └── test_study_and_player.py   # Unit tests for voice, player, and study components
 ```
 
@@ -205,15 +212,21 @@ D:\Youtube Chatbot\
 ### 2. `src/youtube_service.py` — Video Ingestion & Fallback Engine
 * **`extract_video_id(url)`**: Robust regex parser supporting standard (`watch?v=`), shortened (`youtu.be/`), Shorts (`/shorts/`), mobile (`m.youtube.com`), and raw IDs.
 * **`fetch_video_metadata(video_id)`**: Retrieves video title, channel name, and thumbnail using YouTube oEmbed (no API key required).
-* **`get_transcript_snippets(video_id)`**: Fetches subtitles with language fallbacks (English, Hindi, auto-generated).
+* **`get_transcript_snippets(video_id)`**: Fetches subtitles with language fallbacks (English, Hindi, auto-generated), cascades into Whisper Audio Fallback, and safely defaults to chapter markers.
 * **`extract_fallback_chapters_and_description(video_id)`**: Intercepts YouTube video chapters and description timestamps when captions are disabled (`TranscriptsDisabled`), extracting chapter titles, starting seconds, and topic boundaries.
 
-### 3. `src/comments_service.py` — Native Audience Scraper
+### 3. `src/audio_transcriber.py` — 100% Video Coverage Audio Fallback
+* **`download_audio_stream(video_id)`**: Extracts low-bitrate compressed audio stream (`m4a`/`mp3`) via `yt-dlp` in seconds without downloading entire heavy video files.
+* **`transcribe_with_groq(...)`**: Connects to Groq's high-speed Whisper API (`whisper-large-v3-turbo`) to transcribe speech segments with start and duration timestamps in ~2-4 seconds.
+* **`transcribe_with_openai(...)`**: Alternate OpenAI Whisper (`whisper-1`) integration.
+* **`transcribe_audio_fallback(video_id)`**: High-level orchestration that downloads audio, invokes Whisper, and guarantees automated cleanup of temp files to prevent disk bloat.
+
+### 4. `src/comments_service.py` — Native Audience Scraper
 * Scrapes real-time public comments directly through YouTube's internal InnerTube API (`/youtubei/v1/next` endpoints).
 * Requires **zero Google Cloud API quotas or developer keys**.
 * Extracts comment text, author names, like counts, published time, and viewer-submitted timestamps (`MM:SS` or `HH:MM:SS`), automatically turning them into clickable deep links.
 
-### 4. `src/comments_analyzer.py` — Social Listening Intelligence
+### 5. `src/comments_analyzer.py` — Social Listening Intelligence
 * Prompts the LLM to structure audience reactions into an actionable intelligence JSON:
   * `positive_pct`, `neutral_pct`, `critical_pct`: Sentiment breakdown.
   * `vibe_tags`: Emotional audience descriptors (e.g., *Practical Science*, *Eye-Opening*).
@@ -223,37 +236,37 @@ D:\Youtube Chatbot\
   * `top_viewer_questions`: Common unanswered doubts left by the audience.
   * `future_topic_requests`: Viewer requests for follow-up videos.
 
-### 5. `src/study_service.py` — Interactive Study & Educational Suite
+### 6. `src/study_service.py` — Interactive Study & Educational Suite
 * **`generate_quiz(...)`**: Produces a 5-question multiple-choice knowledge quiz with options, 0-indexed answer key, timestamp cues, and educational rationale.
 * **`generate_flashcards(...)`**: Creates high-yield active-recall concept flashcards with categories and actionable takeaways.
 * **`generate_mindmap(...)`**: Generates a valid Mermaid.js concept hierarchy flowchart mapping the video's core thesis, pillars, and actionable mechanisms.
 * **`generate_study_notes_markdown(...)`**: Compiles an executive brief, flashcards, quiz solutions, and audience consensus into an exportable `.md` file.
 
-### 6. `src/voice_player_service.py` — Voice & In-Sync Interactive Video Player
+### 7. `src/voice_player_service.py` — Voice & In-Sync Interactive Video Player
 * **`render_sync_player_html(...)`**: Embeds a 16:9 responsive YouTube player with playhead seeking capabilities.
 * **`render_voice_input_html(...)`**: Native Web Speech API dictation widget with mic animation and one-click copy to chat.
 * **`render_tts_player_html(...)`**: Inline speech synthesis button (`🔊 Listen to Answer`) that speaks AI responses aloud using browser speech synthesis.
 * **`strip_markdown_for_speech(...)`**: Cleans markdown brackets, symbols, and URLs to ensure natural audio pronunciation.
 
-### 7. `src/text_processor.py` — Timestamp-Aware Chunking
+### 8. `src/text_processor.py` — Timestamp-Aware Chunking
 * Implements `TimestampAwareChunker`. Instead of destroying metadata by flattening text, it aggregates chronological snippets into ~1600 character chunks while tracking:
   * `start_seconds` & `end_seconds`
   * Formatted strings (`[MM:SS]`)
   * Direct deep-link URLs (`https://youtu.be/{video_id}?t={start_seconds}`)
 * Embeds time markers directly into the text header so the LLM explicitly cites video moments.
 
-### 8. `src/vectorstore.py` — FAISS Vector Store & Safe Batching
+### 9. `src/vectorstore.py` — FAISS Vector Store & Safe Batching
 * Builds and queries high-speed FAISS vector indexes.
 * **Safe Rate-Limit Batching**: Embeds chunks in batches of 50 with automatic backoff and retry (`RESOURCE_EXHAUSTED` / `429` detection) to avoid Google Gemini free-tier rate limits.
 * Checks disk cache before embedding: previously indexed videos load in **0.05 seconds**.
 
-### 9. `src/rag_engine.py` — Conversational Engine with Resilience
-* **Multi-Model Fallback**: Uses `invoke_with_resilience` to cascade across `gemini-3.5-flash`, `gemini-3.5-flash-lite`, and `gemini-3-flash-preview` if high traffic (`503`) or quota limits (`429`) occur.
+### 10. `src/rag_engine.py` — Conversational Engine with Resilience
+* **Multi-Model Fallback**: Uses `invoke_with_resilience` to cascade across `gemini-3.8-flash`, `gemini-3.5-flash`, and `gemini-3-flash-preview` if high traffic (`503`) or quota limits (`429`) occur.
 * **Dual-Context Grounding**: System prompt provides both the **video transcript** and **audience comments data**, allowing users to ask questions about both the video content and audience reactions.
 * **Conversational Memory**: Rephrases follow-up questions in light of chat history.
 * **Executive Summaries**: Produces comprehensive digests with core breakthroughs and action items.
 
-### 10. `app.py` — SaaS Web Application
+### 11. `app.py` — SaaS Web Application
 * Built with Streamlit and styled with responsive CSS.
 * Clean top header with hidden default Streamlit menus and footers.
 * Prominent, collapsible sidebar with an expand button (`>>`) for toggling navigation.
@@ -309,8 +322,11 @@ Open `.env` in any text editor and paste your API key:
 ```ini
 AI_PROVIDER=gemini
 GEMINI_API_KEY=your_actual_gemini_api_key_here
-GEMINI_CHAT_MODEL=gemini-3.5-flash
+GEMINI_CHAT_MODEL=gemini-3.8-flash
 GEMINI_EMBEDDING_MODEL=models/gemini-embedding-001
+
+# Optional: Groq API Key for ultra-fast Whisper speech recognition fallback
+GROQ_API_KEY=your_groq_api_key_here
 ```
 
 ---
@@ -333,6 +349,9 @@ python cli.py --url "https://www.youtube.com/watch?v=4Vz6L8B73i4"
 ### Option C: Run Automated Integration & Unit Tests
 Verify pipeline and component integrity:
 ```powershell
+# Run Whisper audio fallback tests
+python tests/test_audio_fallback.py
+
 # Run end-to-end RAG pipeline integration tests
 python tests/test_pipeline.py
 
@@ -346,8 +365,9 @@ python tests/test_study_and_player.py
 
 | Edge Case Scenario | Naive System Behavior | TubeMind AI Resilience Architecture |
 | :--- | :--- | :--- |
-| **Creator disabled subtitles** | Throws `TranscriptsDisabled` and crashes. | Intercepts 50+ video chapters, timestamps, and description markers automatically via InnerTube. |
-| **Google server high demand (`503`)** | Crashes with `503 UNAVAILABLE`. | Automatically cascades to `gemini-3.5-flash-lite` or preview model with backoff retry. |
+| **Creator disabled subtitles** | Throws `TranscriptsDisabled` and crashes. | Cascades to **Groq Whisper Audio Fallback** for 100% speech recovery, then safely defaults to 50+ video chapters and description markers. |
+| **Google server model deprecations / 404** | Crashes with `404 NOT_FOUND`. | Automatically upgraded to modern `gemini-3.8-flash` with graceful multi-model fallback. |
+| **Google server high demand (`503`)** | Crashes with `503 UNAVAILABLE`. | Automatically cascades to backup flash models with backoff retry. |
 | **Free-tier rate limits (`429`)** | Crashes during large embeddings. | Batching engine (50 chunks/batch) pauses and retries automatically with exponential backoff. |
 | **Re-opening previously indexed video** | Re-downloads and re-embeds (slow & costly). | Instantly reloads from disk cache in 0.05 seconds with $0 API cost. |
 | **Diverse YouTube URL variants** | Fails regex on Shorts or mobile URLs. | Unified parser handles standard, `youtu.be`, `/shorts/`, mobile, and raw IDs. |

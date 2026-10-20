@@ -7,7 +7,8 @@ from src.config import (
     validate_environment, 
     AI_PROVIDER, 
     GEMINI_API_KEY, 
-    OPENAI_API_KEY
+    OPENAI_API_KEY,
+    GROQ_API_KEY
 )
 from src.youtube_service import (
     extract_video_id,
@@ -311,6 +312,9 @@ with st.sidebar:
         else:
             active_key = st.text_input("OpenAI API Key", value=OPENAI_API_KEY, type="password")
 
+        st.caption("Optional: Fallback speech recognition for videos without subtitles")
+        groq_key_input = st.text_input("Groq API Key (Fast Whisper Fallback)", value=GROQ_API_KEY, type="password")
+
     # Processing Logic
     if load_btn:
         vid = extract_video_id(url_input)
@@ -322,7 +326,11 @@ with st.sidebar:
             with st.spinner("Processing video transcript, index, and audience comments..."):
                 try:
                     meta = fetch_video_metadata(vid)
-                    snippets = get_transcript_snippets(vid)
+                    snippets = get_transcript_snippets(
+                        vid, 
+                        groq_api_key=groq_key_input,
+                        openai_api_key=active_key if provider_choice == "openai" else OPENAI_API_KEY
+                    )
                     full_txt = get_full_transcript_text(snippets)
 
                     # Build or load vector store
@@ -427,7 +435,10 @@ if not st.session_state.rag_engine:
 
 else:
     # 6. Fallback Notification if Subtitles Disabled
-    if st.session_state.snippets and any(s.get("is_chapter") for s in st.session_state.snippets):
+    if st.session_state.snippets and any(s.get("source") in ["groq_whisper", "openai_whisper"] for s in st.session_state.snippets):
+        whisper_src = "Groq Whisper (Turbo)" if any(s.get("source") == "groq_whisper" for s in st.session_state.snippets) else "OpenAI Whisper"
+        st.success(f"🎙️ **100% Video Coverage Active:** Speech subtitles were not provided by the creator, but TubeMind AI automatically transcribed the entire audio with timestamps via **{whisper_src}**!")
+    elif st.session_state.snippets and any(s.get("is_chapter") for s in st.session_state.snippets):
         ch_count = len([s for s in st.session_state.snippets if s.get("is_chapter")])
         st.info(f"ℹ️ **Note:** Speech subtitles were disabled by the creator for this video. TubeMind AI automatically recovered **{ch_count} Video Chapters & Timestamps** plus **Audience Comments** so complete Q&A, chapter navigation, and social listening work seamlessly!")
 

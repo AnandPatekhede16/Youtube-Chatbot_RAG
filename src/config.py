@@ -10,6 +10,7 @@ TRANSCRIPTS_DIR = STORAGE_DIR / "transcripts"
 COMMENTS_DIR = STORAGE_DIR / "comments"
 COMMENTS_ANALYSIS_DIR = STORAGE_DIR / "comments_analysis"
 STUDY_DIR = STORAGE_DIR / "study"
+TEMP_AUDIO_DIR = STORAGE_DIR / "temp_audio"
 
 # Ensure storage directories exist
 VECTORS_DIR.mkdir(parents=True, exist_ok=True)
@@ -17,6 +18,7 @@ TRANSCRIPTS_DIR.mkdir(parents=True, exist_ok=True)
 COMMENTS_DIR.mkdir(parents=True, exist_ok=True)
 COMMENTS_ANALYSIS_DIR.mkdir(parents=True, exist_ok=True)
 STUDY_DIR.mkdir(parents=True, exist_ok=True)
+TEMP_AUDIO_DIR.mkdir(parents=True, exist_ok=True)
 
 # Load .env file
 ENV_PATH = PROJECT_ROOT / ".env"
@@ -27,8 +29,11 @@ AI_PROVIDER = os.getenv("AI_PROVIDER", "gemini").strip().lower()
 
 # Gemini Settings
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
-GEMINI_CHAT_MODEL = os.getenv("GEMINI_CHAT_MODEL", "gemini-3.5-flash")
+GEMINI_CHAT_MODEL = os.getenv("GEMINI_CHAT_MODEL", "gemini-3.8-flash")
 GEMINI_EMBEDDING_MODEL = os.getenv("GEMINI_EMBEDDING_MODEL", "models/gemini-embedding-001")
+
+# Groq Whisper Settings (for 100% video coverage audio fallback)
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "").strip()
 
 # OpenAI Settings
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "").strip()

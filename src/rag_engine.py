@@ -73,7 +73,7 @@ def invoke_with_resilience(chain_builder_func, inputs: Dict[str, Any], provider:
         active_key = api_key or GEMINI_API_KEY
         
         # Priority order of available high-quota models
-        models_to_try = [GEMINI_CHAT_MODEL, "gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3-flash-preview"]
+        models_to_try = [GEMINI_CHAT_MODEL, "gemini-3.8-flash", "gemini-3.5-flash", "gemini-3-flash-preview"]
         candidate_models = list(dict.fromkeys(models_to_try))
         
         last_error = None

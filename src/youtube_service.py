@@ -183,12 +183,19 @@ def extract_fallback_chapters_and_description(video_id: str) -> List[Dict[str, A
 
     return []
 
-def get_transcript_snippets(video_id: str) -> List[Dict[str, Any]]:
+def get_transcript_snippets(
+    video_id: str, 
+    groq_api_key: Optional[str] = None, 
+    openai_api_key: Optional[str] = None
+) -> List[Dict[str, Any]]:
     """
     Retrieve raw transcript chunks with start timestamps and duration.
     Caches results locally to avoid redundant network calls.
-    If speech captions are disabled by the owner, automatically falls back to 
-    video chapter markers and description timestamps so the pipeline never breaks!
+    
+    Cascading Multi-Tier Fallback:
+    1. Native YouTube Captions (YouTubeTranscriptApi - multi-lingual)
+    2. Audio AI Fallback (yt-dlp stream + Groq Whisper / OpenAI Whisper) for 100% video coverage
+    3. Structural Video Chapters & Description Markers
     """
     cache_file = TRANSCRIPTS_DIR / f"{video_id}.json"
 
@@ -244,14 +251,30 @@ def get_transcript_snippets(video_id: str) -> List[Dict[str, Any]]:
         except Exception as e:
             logger.debug(f"Legacy fetch attempt failed: {e}")
 
-    # 3. Automatic Resilient Fallback: Chapter Markers & Video Description
+    # 3. Topic 1: 100% Video Coverage - Audio AI Transcription Fallback (Whisper)
     if not raw_snippets:
-        logger.info(f"Subtitles disabled for '{video_id}'. Activating chapter & description fallback...")
+        try:
+            from src.audio_transcriber import transcribe_audio_fallback
+            logger.info(f"Subtitles disabled for '{video_id}'. Activating Whisper Audio Fallback...")
+            audio_snippets = transcribe_audio_fallback(
+                video_id=video_id, 
+                groq_api_key=groq_api_key, 
+                openai_api_key=openai_api_key
+            )
+            if audio_snippets:
+                raw_snippets = audio_snippets
+                logger.info(f"Successfully recovered transcript via Whisper Audio Fallback ({len(raw_snippets)} segments)!")
+        except Exception as e:
+            logger.warning(f"Audio transcription fallback encountered an issue: {e}")
+
+    # 4. Resilient Fallback: Chapter Markers & Video Description
+    if not raw_snippets:
+        logger.info(f"Audio fallback unavailable or incomplete for '{video_id}'. Activating chapter & description fallback...")
         raw_snippets = extract_fallback_chapters_and_description(video_id)
 
     if not raw_snippets:
         raise RuntimeError(
-            f"Could not retrieve transcript or chapters for video '{video_id}'. "
+            f"Could not retrieve transcript, audio speech, or chapters for video '{video_id}'. "
             f"The video may be private, age-restricted, or unavailable."
         )
 
