@@ -137,8 +137,8 @@ def generate_quiz(
         except Exception as e:
             logger.warning(f"Error reading quiz cache: {e}")
 
-    # Limit text to ~25,000 characters for speed and economy
-    sample_text = transcript_text[:25000]
+    # Limit text to ~14,000 characters for high speed and sharp focus
+    sample_text = transcript_text[:14000]
 
     def build_chain(llm):
         prompt = ChatPromptTemplate.from_template(QUIZ_PROMPT)
@@ -227,7 +227,7 @@ def generate_flashcards(
         except Exception as e:
             logger.warning(f"Error reading flashcards cache: {e}")
 
-    sample_text = transcript_text[:25000]
+    sample_text = transcript_text[:14000]
 
     def build_chain(llm):
         prompt = ChatPromptTemplate.from_template(FLASHCARDS_PROMPT)
@@ -304,7 +304,7 @@ def generate_mindmap(
         except Exception as e:
             logger.warning(f"Error reading mindmap cache: {e}")
 
-    sample_text = transcript_text[:25000]
+    sample_text = transcript_text[:14000]
 
     def build_chain(llm):
         prompt = ChatPromptTemplate.from_template(MINDMAP_PROMPT)

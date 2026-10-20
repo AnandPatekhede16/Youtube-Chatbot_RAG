@@ -64,16 +64,22 @@ A concise 2-3 paragraph overview of the video's core theme and message.
 
 def invoke_with_resilience(chain_builder_func, inputs: Dict[str, Any], provider: str = AI_PROVIDER, api_key: Optional[str] = None):
     """
-    Executes a LangChain runnable with automatic model fallback and retries 
-    to guarantee 100% reliability against 503 (high demand) and 429 (rate limit) errors.
+    Executes a LangChain runnable with ultra-fast model execution and instant fallback 
+    to guarantee high-speed responses and 100% reliability against 503 and 429 quota exhaustion.
     """
     provider = provider.lower()
     if provider == "gemini":
         from langchain_google_genai import ChatGoogleGenerativeAI
         active_key = api_key or GEMINI_API_KEY
         
-        # Priority order of available high-quota models
-        models_to_try = [GEMINI_CHAT_MODEL, "gemini-3.8-flash", "gemini-3.5-flash", "gemini-3-flash-preview"]
+        # Priority order: Highest speed and active free-tier quota first
+        models_to_try = [
+            "gemini-3.5-flash-lite",
+            "gemini-3.1-flash-lite",
+            GEMINI_CHAT_MODEL,
+            "gemini-3.8-flash",
+            "gemini-3.5-flash"
+        ]
         candidate_models = list(dict.fromkeys(models_to_try))
         
         last_error = None
@@ -83,7 +89,8 @@ def invoke_with_resilience(chain_builder_func, inputs: Dict[str, Any], provider:
                     kwargs = {
                         "model": model_name,
                         "google_api_key": active_key,
-                        "timeout": 60
+                        "max_retries": 0,
+                        "timeout": 20
                     }
                     if "flash-lite" not in model_name:
                         kwargs["temperature"] = 0.2
@@ -94,9 +101,13 @@ def invoke_with_resilience(chain_builder_func, inputs: Dict[str, Any], provider:
                 except Exception as e:
                     last_error = e
                     err_str = str(e)
-                    if any(code in err_str for code in ["503", "UNAVAILABLE", "429", "RESOURCE_EXHAUSTED", "rate_limit"]):
-                        logger.warning(f"Gemini model {model_name} busy or limited (Attempt {attempt+1}). Retrying / switching...")
-                        time.sleep(1.5)
+                    # If quota exhausted (429), break immediately to try next model without waiting!
+                    if any(code in err_str for code in ["429", "RESOURCE_EXHAUSTED", "rate_limit"]):
+                        logger.warning(f"Gemini model {model_name} quota exhausted (429). Fast failover to next model...")
+                        break
+                    elif any(code in err_str for code in ["503", "UNAVAILABLE"]):
+                        logger.warning(f"Gemini model {model_name} busy (503). Retrying once...")
+                        time.sleep(0.5)
                         continue
                     else:
                         break
@@ -237,7 +248,7 @@ Audience Comments Intelligence:
         """
         Generates a comprehensive structured summary of the entire video.
         """
-        max_chars = 90000
+        max_chars = 35000
         truncated_text = full_transcript_text[:max_chars]
         if len(full_transcript_text) > max_chars:
             truncated_text += "\n[Transcript truncated due to length...]"

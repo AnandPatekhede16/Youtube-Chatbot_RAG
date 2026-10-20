@@ -173,7 +173,7 @@ def generate_viral_clips(
             logger.warning(f"Error reading viral clips cache: {e}")
 
     # Limit transcript to ~25,000 chars for API efficiency
-    trimmed_text = transcript_text[:25000]
+    trimmed_text = transcript_text[:15000]
 
     def build_chain(llm):
         prompt = ChatPromptTemplate.from_template(VIRAL_CLIPS_PROMPT)
@@ -263,7 +263,7 @@ def generate_social_thread(
         except Exception as e:
             logger.warning(f"Error reading {platform} thread cache: {e}")
 
-    trimmed_text = transcript_text[:25000]
+    trimmed_text = transcript_text[:15000]
     prompt_str = TWITTER_THREAD_PROMPT if platform == "twitter" else LINKEDIN_POST_PROMPT
 
     def build_chain(llm):
@@ -354,7 +354,7 @@ def generate_seo_blog(
         except Exception as e:
             logger.warning(f"Error reading SEO blog cache: {e}")
 
-    trimmed_text = transcript_text[:25000]
+    trimmed_text = transcript_text[:15000]
     title = video_metadata.get("title", f"Video {video_id}")
     author = video_metadata.get("author", "the speaker")
 
